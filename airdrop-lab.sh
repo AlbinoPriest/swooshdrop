@@ -4,19 +4,32 @@ set -euo pipefail
 lab=/opt/airdrop-lab
 out=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 destination=${3:-$out/received}
-mkdir -p "$out/logs" "$destination" /run/airdrop-lab
-exec 9>/run/airdrop-lab/session.lock
+vendor=${5:-0bda}
+product=${6:-8179}
+serial=${7:-}
+[[ "$vendor" =~ ^[0-9a-f]{4}$ && "$product" =~ ^[0-9a-f]{4}$ ]] || { echo 'Invalid adapter identity'; exit 2; }
+adapter_matches() {
+    local dev=$1
+    [[ -f "$dev/idVendor" && -f "$dev/idProduct" ]] || return 1
+    [[ "$(cat "$dev/idVendor")" == "$vendor" && "$(cat "$dev/idProduct")" == "$product" ]] || return 1
+    [[ -z "$serial" ]] || [[ -f "$dev/serial" && "$(cat "$dev/serial")" == "$serial" ]]
+}
+mkdir -p "$out/logs" "$destination" /run/airdrop-lab /mnt/wsl/windrop
+exec 9>/mnt/wsl/windrop/session.lock
 flock -n 9 || { echo 'An AirDrop lab session is already running.' >&2; exit 75; }
 
 case "${1:-8188eu}" in
     rtl8xxxu) driver="$lab/kernel/drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu.ko"; driver_module=rtl8xxxu; usb_driver=rtl8xxxu ;;
     8188eu) driver="$lab/rtl8188eus/8188eu.ko"; driver_module=8188eu; usb_driver=8188eu ;;
+    mt76x0u|mt76x2u|mt7601u) driver_module=$1; usb_driver=$1; driver='' ;;
     *) echo 'Unknown driver selection.' >&2; exit 2 ;;
 esac
-[[ -f "$driver" ]] || { echo 'The matching radio driver has not finished building.' >&2; exit 1; }
-[[ "$(modinfo -F vermagic "$driver")" == "$(uname -r) "* ]] || {
-    echo 'WSL kernel changed. Rebuild the driver before testing.' >&2; exit 1;
-}
+module_root="$lab/drivers"
+if [[ -d "$module_root/lib/modules/$(uname -r)" ]]; then
+    driver=$(modinfo -b "$module_root" -k "$(uname -r)" -n "$driver_module")
+fi
+[[ -f "$driver" ]] || { echo 'No radio driver package matches this WSL kernel. Run WinDrop Setup to check compatibility.' >&2; exit 1; }
+[[ "$(modinfo -F vermagic "$driver")" == "$(uname -r) "* ]] || { echo 'Radio driver and WSL kernel do not match.' >&2; exit 1; }
 radio=''
 owl_pid=''
 bridge_pid=''
@@ -45,18 +58,29 @@ printf '%s\n' "${4:-console}" > /run/airdrop-lab/session.owner
 # Supply uncompressed firmware in a shared mount, then restore the search path after probe.
 firmware_shared=/mnt/wsl/airdrop-lab-firmware
 mkdir -p "$firmware_shared/rtlwifi"
-cp /lib/firmware/rtlwifi/rtl8188eufw.bin "$firmware_shared/rtlwifi/"
-cp /lib/firmware/regulatory.db /lib/firmware/regulatory.db.p7s "$firmware_shared/"
+if [[ -d "$lab/firmware" ]]; then
+    cp -a "$lab/firmware/." "$firmware_shared/"
+else
+    cp /lib/firmware/rtlwifi/rtl8188eufw.bin "$firmware_shared/rtlwifi/"
+    cp /lib/firmware/regulatory.db /lib/firmware/regulatory.db.p7s "$firmware_shared/"
+fi
+# Reject ambiguity before touching a radio, including devices without real USB serials.
+matches=()
+for usb in /sys/bus/usb/devices/*; do adapter_matches "$usb" && matches+=("$usb"); done
+[[ ${#matches[@]} -eq 1 ]] || { echo 'Expected exactly one selected USB adapter in WSL.' >&2; exit 1; }
 printf '%s' "$firmware_shared" > "$firmware_parameter"
-modprobe mac80211
-modprobe led-class
-if ! grep -q "^$driver_module " /proc/modules; then
-    insmod "$driver"
+if [[ -d "$module_root/lib/modules/$(uname -r)" ]]; then
+    modprobe -d "$module_root" mac80211
+    modprobe -d "$module_root" led-class
+    modprobe -d "$module_root" "$driver_module"
+else
+    modprobe mac80211
+    modprobe led-class
+    if ! grep -q "^$driver_module " /proc/modules; then insmod "$driver"; fi
 fi
     # A previous probe may have failed before firmware was available. Retry only this USB device.
     for usb in /sys/bus/usb/devices/*; do
-        [[ -f "$usb/idVendor" && -f "$usb/idProduct" && -f "$usb/serial" ]] || continue
-        [[ "$(cat "$usb/idVendor")" == 0bda && "$(cat "$usb/idProduct")" == 8179 && "$(cat "$usb/serial")" == 00E04C0001 ]] || continue
+        adapter_matches "$usb" || continue
         for usbif in "$usb":*; do
             [[ -d "$usbif" ]] || continue
             current_driver=''
@@ -74,14 +98,13 @@ for pass in {1..30}; do
     candidates=()
     for net in /sys/class/net/*; do
         usb=$(readlink -f "$net/device/.." 2>/dev/null || true)
-        [[ -f "$usb/idVendor" && -f "$usb/idProduct" && -f "$usb/serial" ]] || continue
-        [[ "$(cat "$usb/idVendor")" == '0bda' && "$(cat "$usb/idProduct")" == '8179' && "$(cat "$usb/serial")" == '00E04C0001' ]] || continue
+        adapter_matches "$usb" || continue
         candidates+=("${net##*/}")
     done
     [[ ${#candidates[@]} -eq 1 ]] && { radio=${candidates[0]}; break; }
     sleep 0.2
 done
-[[ -n "$radio" ]] || { echo 'The expected TP-Link USB adapter is not present.' >&2; exit 1; }
+[[ -n "$radio" ]] || { echo 'The selected USB adapter could not start. Check the adapter and driver in WinDrop Setup.' >&2; exit 1; }
 restore_firmware
 
 ip link set "$radio" down

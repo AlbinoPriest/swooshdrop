@@ -2,13 +2,15 @@
 set -euo pipefail
 case "${1:-}" in
     available)
-        mkdir -p /run/airdrop-lab
-        flock -n /run/airdrop-lab/session.lock -c true
+        mkdir -p /run/airdrop-lab /mnt/wsl/windrop
+        flock -n /mnt/wsl/windrop/session.lock -c true
         ;;
     attached)
+        vendor=${2:-0bda}; product=${3:-8179}; serial=${4:-}
+        [[ "$vendor" =~ ^[0-9a-f]{4}$ && "$product" =~ ^[0-9a-f]{4}$ ]] || exit 2
         for dev in /sys/bus/usb/devices/*; do
-            [[ -f "$dev/idVendor" && -f "$dev/idProduct" && -f "$dev/serial" ]] || continue
-            if [[ "$(cat "$dev/idVendor")" == 0bda && "$(cat "$dev/idProduct")" == 8179 && "$(cat "$dev/serial")" == 00E04C0001 ]]; then
+            [[ -f "$dev/idVendor" && -f "$dev/idProduct" ]] || continue
+            if [[ "$(cat "$dev/idVendor")" == "$vendor" && "$(cat "$dev/idProduct")" == "$product" ]] && { [[ -z "$serial" ]] || [[ -f "$dev/serial" && "$(cat "$dev/serial")" == "$serial" ]]; }; then
                 exit 0
             fi
         done
@@ -18,7 +20,7 @@ case "${1:-}" in
         if [[ -n "${2:-}" ]] && [[ ! -f /run/airdrop-lab/session.owner || "$(cat /run/airdrop-lab/session.owner)" != "$2" ]]; then
             # Startup may fail before recording an owner. A free session lock
             # proves no receiver is running, so the caller may detach its USB.
-            if [[ ! -f /run/airdrop-lab/session.owner ]] && flock -n /run/airdrop-lab/session.lock -c true; then
+            if [[ ! -f /run/airdrop-lab/session.owner ]] && flock -n /mnt/wsl/windrop/session.lock -c true; then
                 exit 0
             fi
             echo 'This receiver session belongs to a different instance.' >&2

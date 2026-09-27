@@ -1,0 +1,518 @@
+[
+  {
+    "Vendor": "7392",
+    "Product": "b811",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "056e",
+    "Product": "4008",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "331b",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "3311",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "3310",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "330f",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0df6",
+    "Product": "0076",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "010c",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "07b8",
+    "Product": "8179",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "0179",
+    "Driver": "8188eu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "8179",
+    "Driver": "8188eu",
+    "Status": "tested"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "7650",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "7630",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0105",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "010b",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0123",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0df6",
+    "Product": "0079",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "7392",
+    "Product": "c711",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "20f4",
+    "Product": "806b",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "293c",
+    "Product": "5702",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "057c",
+    "Product": "8502",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "04bb",
+    "Product": "0951",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "07b8",
+    "Product": "7610",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0586",
+    "Product": "3425",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "3d02",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2019",
+    "Product": "ab31",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0df6",
+    "Product": "0075",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "17db",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "17d1",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "760a",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "761a",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "7392",
+    "Product": "b711",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "7392",
+    "Product": "a711",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "7610",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "13b1",
+    "Product": "003e",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "7610",
+    "Driver": "mt76x0u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0137",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "045e",
+    "Product": "02fe",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "045e",
+    "Product": "02e6",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0846",
+    "Product": "9053",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0846",
+    "Product": "9014",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2c4e",
+    "Product": "0103",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0471",
+    "Product": "7600",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0471",
+    "Product": "2126",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "7632",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "057c",
+    "Product": "8503",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "7612",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "180b",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "17eb",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "1833",
+    "Driver": "mt76x2u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "7392",
+    "Product": "7710",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2a5f",
+    "Product": "1000",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2955",
+    "Product": "1003",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2955",
+    "Product": "1001",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2955",
+    "Product": "0001",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2717",
+    "Product": "4106",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "3d04",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "760d",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "760c",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "760b",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "148f",
+    "Product": "7601",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "13d3",
+    "Product": "3434",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "13d3",
+    "Product": "3431",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "760b",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0e8d",
+    "Product": "760a",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "17d3",
+    "Driver": "mt7601u",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "3328",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0135",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "318b",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "7392",
+    "Product": "b722",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "18f1",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "f192",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "2005",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "b711",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "ffef",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0b05",
+    "Product": "18f0",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2c4e",
+    "Product": "0102",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0111",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "f179",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0109",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2001",
+    "Product": "3319",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "2357",
+    "Product": "0108",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "818b",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "0724",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "1724",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  },
+  {
+    "Vendor": "0bda",
+    "Product": "8724",
+    "Driver": "rtl8xxxu",
+    "Status": "experimental"
+  }
+]

@@ -1,45 +1,66 @@
 # WinDrop PC
 
-Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. WinDrop 0.2.2 provides a native Windows app, a received-files gallery, image previews, notification approval buttons, and optional startup at sign-in.
+Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. Includes a received-files gallery, image and web-address previews, notification approval buttons, automatic opening of accepted links, a tray app, and optional startup at sign-in.
 
-This is a hardware beta for a provisioned PC. It dedicates a TP-Link TL-WN725N USB adapter to the separate **AirDropLab** WSL distribution. OWL supplies AWDL, WinDrop handles AirDrop, and the Windows app saves files. The EXE embeds the protocol runtime and app resources; usbipd-win, WSL, Linux image codecs, and the matching radio driver remain separate prerequisites. See [provisioning notes](docs/SETUP.md).
+**0.3 is an installer beta.** Download **[WinDropSetup.exe](https://github.com/AlbinoPriest/windrop-pc/releases/tag/v0.3.0)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
 
-## Using the app
+## Requirements and compatibility
 
-1. Launch **WinDrop** from the desktop or Start menu with the dedicated adapter connected. Receiving starts automatically by default.
-2. On iPhone, enable Wi-Fi and Bluetooth, use **Everyone for 10 Minutes**, and choose **Share → AirDrop → WinDrop PC**.
-3. Check the sender and preview, then click **Accept** or **Decline** in the Windows notification. You can also approve in the app. Unanswered requests expire after 55 seconds.
-4. Browse received items in the gallery. **Open** opens a file or a saved HTTP/HTTPS link; **Show in folder** selects its saved file.
+- Windows 10 22H2 or Windows 11, Intel/AMD x64, virtualization, and WSL 2. The development Windows 11 PC has been tested; a fresh second PC and Windows 10 are unverified.
+- This beta's radio modules require **6.18.33.2-microsoft-standard-WSL2**. Setup refuses incompatible kernels; it does not downgrade WSL or boot a custom kernel.
+- A compatible dedicated USB Wi-Fi adapter and separate internet connection. **TP-Link TL-WN725N, USB ID `0bda:8179` (RTL8188EU)** has passed phone transfers. Other revisions may differ.
+- Administrator permission for initial prerequisites and sharing the selected USB device. Everyday receiving runs as your normal user.
+- Internet and several GB of free space for initial setup. The approximately 256 MiB installer includes source materials; setup downloads a verified Ubuntu image and runtime packages.
 
-Files default to **Downloads\WinDrop**. Settings lets you change this folder, select receiving on launch, and enable **Start WinDrop when I sign in to Windows**. Sign-in startup is off unless enabled. Closing the window leaves WinDrop in the tray; **Stop receiving** returns the adapter to Windows, and tray **Quit** stops receiving and exits.
+The catalog contains **86 USB device IDs** covered by bundled Realtek and MediaTek drivers. All except the tested ID are **experimental**, not guaranteed AirDrop compatibility. Arbitrary adapters, built-in PCI Wi-Fi, sharing Windows' internet adapter, ARM/32-bit PCs, and Contacts Only are unsupported. See [compatibility](docs/COMPATIBILITY.md).
 
-Photo thumbnails are separate cached previews. Received files are not resized or recompressed by WinDrop. The app requests unconverted media; the sender ultimately controls what it shares. Web links are shown before approval, stored as text files, and opened in the default browser after an accepted transfer finishes. Disable **Open accepted web links in my browser** in Settings to save links without automatically opening them; **Open** remains available in the gallery. History, settings, previews, and diagnostics live under `%LOCALAPPDATA%\Programs\WinDrop\Data`.
+## Install and receive
 
-Discovery is still intermittent and can take time. Contacts Only and Apple identity integration are not implemented; sender names are unverified. Native notifications depend on Windows notification settings. A custom approval popup is used when notification delivery reports an error or previews are disabled.
+1. Run **WinDropSetup.exe**, then **Check prerequisites**. Restart manually if Windows requests it, then rerun setup. Existing WSL distributions and Docker are preserved.
+2. Select your dedicated USB adapter. Setup shows its device ID and tested/experimental status. Choose optional startup, then **Install WinDrop**.
+3. Open WinDrop. On iPhone enable Wi-Fi and Bluetooth, choose **Everyone for 10 Minutes**, then **Share → AirDrop → WinDrop PC**.
+4. Review the sender and preview and click **Accept** or **Decline** in the notification or app. Unanswered requests expire after 55 seconds. Sender display names are unverified.
 
-## Build and install
+Files default to **Downloads\WinDrop**. Thumbnails are separate cached previews. WinDrop does not resize or recompress received file streams; the iPhone controls what it shares. Exact equality with iPhone originals has not been verified by hashes. Accepted HTTP/HTTPS links are saved and open in the default browser; disable that behavior in Settings if desired.
 
-On a PC with the backend and radio already provisioned, use Windows PowerShell 5.1:
+Closing the window leaves WinDrop receiving in the tray. **Stop receiving** returns the adapter to Windows. Tray **Quit** stops the session and exits. **Settings → Adapter setup** stops receiving and opens setup to change hardware or repair the runtime.
+
+## Updates and removal
+
+Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. Remove **WinDrop PC** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
+
+## Validation and limits
+
+Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. This version's setup engine provisioned a clean Ubuntu runtime, installed and launched the app on the development PC, and advertised the receiver through that runtime. Native COM notification callbacks and startup registration were checked again.
+
+Discovery remains intermittent. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, reboot recovery, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
+
+## Building
+
+The Windows frontend uses .NET Framework 4.8's compiler. The Linux backend must first be built from the pinned WinDrop source and product patch.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDrop.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-WinDrop.ps1 -Launch
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDrop.ps1 -BackendDirectory <backend-output-directory>
 ```
 
-The build uses the Windows .NET Framework 4.8 WPF compiler and embeds the Linux .NET 8 backend from `/opt/airdrop-lab/receiver-product`. Output is `dist\WinDrop.exe`. The installer places it under `%LOCALAPPDATA%\Programs\WinDrop`, creates shortcuts, and registers notification activation. Notification buttons use a registered COM desktop callback; their arguments are passed directly to the running app, without asking Windows to open a URI. Quit the running app before updating. `Build-WinDropTray.ps1` remains a compatibility wrapper for the original build command.
+Runtime and source payloads are built in the provisioned Linux environment in [build notes](docs/SETUP.md):
 
-These are unsigned local builds, not a signed installer for fresh PCs. The current scripts deliberately target USB identity `0bda:8179`, serial `00E04C0001`; another adapter requires driver validation and configuration. Windows' main internet adapter stays separate.
+```bash
+bash scripts/build-extra-radio-modules.sh
+bash scripts/build-runtime-payload.sh
+bash scripts/build-corresponding-source.sh
+```
 
-Console fallback: run `Start-AirDropLab.ps1`. It asks for console approval and runs for 15 minutes. `Stop-AirDropLab.ps1` stops the recorded lab session and detaches the exact USB device; it does not shut down WSL or Docker. Run only one receiver, including console copies.
+Then build the redistributable setup on Windows:
 
-## Validation
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDropSetup.ps1
+```
 
-Real single-photo and three-photo transfers succeeded with an iPhone 16 Pro Max on iOS 27.0. HEIC and PNG files were received with the new gallery and preview system. Safari-link reception was recorded in the gallery, and a fresh photo transfer completed after a native notification Accept callback. COM Show/Accept/Decline routing and optional startup enable/disable were checked. The protocol suite has **224 passing tests**, including accepted/declined links without an upload and rejection of unsafe URL schemes; OWL has **52 passing tests**. Exact equality with iPhone originals has not been checked against source hashes.
+`Install-WinDrop.ps1` remains a developer app-only installer; it does not provision a fresh PC. Older console `AirDropLab` scripts are development helpers tied to the original test hardware. New kernels require matching driver builds and regression testing, not forced module loading.
 
-A small encrypted exchange averaged about 0.33 MB/s including metadata and preview. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, and fresh-machine installation remain unverified.
+## Attribution and licenses
 
-## Source and licenses
+The Windows frontend is MIT-licensed integration work. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop); [OWL](https://github.com/seemoo-lab/owl) implements AWDL. This project does not claim to have invented either implementation.
 
-The repository contains the Windows UI, build/install and radio helpers, pinned dependency revisions, and protocol/driver patches. Received media, credentials, diagnostics, and build artifacts are excluded from source control.
-
-Original app code and WinDrop are MIT licensed. OWL is GPL-3.0; the vendor driver is GPL-2.0-only. The EXE embeds MIT-licensed WinDrop assemblies and original app resources, not OWL or driver binaries. Include [LICENSE](LICENSE), [WinDrop's notice](licenses/WinDrop-LICENSE.txt), and [third-party notices](THIRD-PARTY-NOTICES.md) when distributing builds.
+Setup embeds OWL, GPL kernel/driver modules, minimal firmware, notices, and their corresponding source. Those sources are installed under `Sources`. Ubuntu/codec packages are downloaded separately. See [notices](THIRD-PARTY-NOTICES.md) and [pinned source revisions](source-versions.json). Personal media, captures, credentials, logs, and Linux home directories are excluded from packages and source control.

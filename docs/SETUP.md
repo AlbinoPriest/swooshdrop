@@ -1,5 +1,7 @@
 # Provisioning notes
 
+For ordinary installation use **WinDropSetup.exe** and the [distribution guide](DISTRIBUTION.md). These notes describe the original developer build environment. Shipping builds use `scripts/build-extra-radio-modules.sh`, `scripts/build-runtime-payload.sh`, and `scripts/build-corresponding-source.sh`, then `Build-WinDropSetup.ps1`. MediaTek adapters remain experimental.
+
 The working machine was provisioned interactively. These notes preserve the sources and build steps; they are not an unattended installer or a claim that every WSL kernel/adapter works.
 
 ## Windows and WSL

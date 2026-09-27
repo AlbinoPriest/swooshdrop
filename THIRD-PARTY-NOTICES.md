@@ -1,6 +1,6 @@
 # Third-party notices
 
-This repository stores integration code and patches rather than vendoring dependency source or binaries. Built Windows releases embed MIT-licensed WinDrop assemblies; its license is included with distributed builds. OWL and driver binaries are not embedded.
+The app embeds MIT-licensed WinDrop assemblies. Starting with 0.3, the setup EXE additionally embeds OWL, matching GPL Linux driver modules, minimal redistributable firmware, component notices, and their corresponding source archive. Setup installs the archive under `Sources` so copied installers carry the source materials.
 
 | Component | Upstream | License | Local notice |
 | --- | --- | --- | --- |
@@ -13,6 +13,8 @@ Exact revisions are in `source-versions.json`. `prototype-changes.patch` modifie
 
 The driver repository has license declarations in its source headers rather than a top-level LICENSE file. The included GPL-2.0 text was copied from the matching Linux kernel's `LICENSES/preferred/GPL-2.0`, including its SPDX usage metadata.
 
-usbipd-win is installed separately from its official signed release. This repository does not redistribute that installer or the built kernel/driver binaries.
+usbipd-win and WSL prerequisites are downloaded from official signed releases, not embedded. Bundled driver binaries use the pinned kernel/vendor source. Their corresponding source archive includes kernel configurations, symbol versions, build instructions, vendor changes, OWL, and its submodules. Firmware and regulatory database copyright notices are retained in the runtime's `notices` directory. Source-tree licenses remain in the corresponding source archive.
 
 Preview codecs are installed separately from Ubuntu packages: Pillow (HPND license), libheif (LGPL-3.0-or-later library, with tool-specific licenses), and libde265 (LGPL-3.0-or-later). Their package copyright notices are installed under `/usr/share/doc/`. The Windows EXE does not bundle those codecs. `render-preview.py` invokes these installed tools to create separate thumbnails and leaves the received media untouched.
+
+Firmware notices and WHENCE were retrieved from the official kernel.org Google mirror at revision `3b128b60`, matching the base revision of Ubuntu's installed `linux-firmware` package `20240318.git3b128b60.0ubuntu3.1`. Realtek firmware uses `LICENCE.rtlwifi_firmware.txt`; MediaTek firmware uses `LICENCE.mediatek` or `LICENCE.ralink_a_mediatek_company_firmware` as identified by WHENCE. These separate binary-firmware redistribution terms do not relicense firmware under the app's MIT license or the kernel's GPL. The corresponding license texts and WHENCE are retained under `licenses` and copied into the runtime notices.

@@ -24,8 +24,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("WinDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("WinDrop PC")]
-[assembly: AssemblyVersion("0.2.2.0")]
-[assembly: AssemblyFileVersion("0.2.2.0")]
+[assembly: AssemblyVersion("0.3.0.0")]
+[assembly: AssemblyFileVersion("0.3.0.0")]
 
 public class Preferences
 {
@@ -33,7 +33,9 @@ public class Preferences
     public bool ReceiveOnLaunch { get; set; }
     public bool Notifications { get; set; }
     public bool OpenLinksOnReceive { get; set; }
-    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WinDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; }
+    public string RuntimeDistro { get; set; }
+    public string AdapterInstanceId { get; set; }
+    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WinDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; RuntimeDistro = "WinDropRuntime"; }
 }
 
 public class TransferItem : INotifyPropertyChanged
@@ -69,7 +71,7 @@ public sealed class WinDropTray
     readonly DispatcherTimer expiry = new DispatcherTimer();
     Preferences settings;
     Process receiver;
-    string control, bus, token;
+    string control, bus, token, sessionDevice;
     bool ownsSession, busy, quitting, receivingIntent, loadingSettings, rendering;
     Dictionary<string, object> incoming;
     DateTime deadline;
@@ -84,7 +86,7 @@ public sealed class WinDropTray
         bool created;
         using (var mutex = new Mutex(true, render ? "Local\\WinDrop.PC.Render" : "Local\\WinDrop.PC.Instance", out created))
         {
-            if (!created) { ForwardActivation(args.Length > 0 ? args[0] : "windrop://show"); return; }
+            if (!created) { ForwardActivation(args.Length > 0 ? (args[0] == "--quit" ? "windrop://quit" : args[0]) : "windrop://show"); return; }
             var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             string dataOverride = Option(args, "--data-dir");
             var app = new WinDropTray(dataOverride, render);
@@ -141,6 +143,13 @@ public sealed class WinDropTray
         Find<Button>("BannerAccept").Click += delegate { Decide(true); };
         Find<Button>("BannerDecline").Click += delegate { Decide(false); };
         Find<Button>("DiagnosticsButton").Click += delegate { Directory.CreateDirectory(Path.Combine(data, "Logs")); Process.Start("explorer.exe", Quote(Path.Combine(data, "Logs"))); };
+        Find<Button>("SetupButton").Click += async delegate
+        {
+            string setup = Path.Combine(Path.GetDirectoryName(exe), "WinDropSetup.exe");
+            if (!File.Exists(setup)) { MessageBox.Show("Download and run WinDropSetup.exe to set up this PC or change its adapter.", "WinDrop Setup"); return; }
+            receivingIntent = false; await StopReceiving(); if (ownsSession) return;
+            Process.Start(setup); quitting = true; tray.Dispose(); Application.Current.Shutdown();
+        };
         Find<Button>("LicensesButton").Click += delegate { MessageBox.Show(ResourceText("App-LICENSE.txt") + "\n\nWinDrop protocol dependency\n\n" + ResourceText("Protocol-LICENSE.txt"), "WinDrop licenses"); };
         Find<ItemsControl>("Transfers").AddHandler(Button.ClickEvent, new RoutedEventHandler(OpenItem));
         loadingSettings = true;
@@ -272,7 +281,7 @@ public sealed class WinDropTray
             Task.WaitAll(output, error); if (process.ExitCode != 0) throw new Exception(error.Result + output.Result); return output.Result.Trim();
         }
     }
-    string Wsl(params string[] args) { var all = new List<string> { "-d", "AirDropLab", "-u", "root", "--exec" }; all.AddRange(args); return Run("wsl.exe", all.ToArray()); }
+    string Wsl(params string[] args) { var all = new List<string> { "-d", settings.RuntimeDistro, "-u", "root", "--exec" }; all.AddRange(args); return Run("wsl.exe", all.ToArray()); }
     string LinuxPath(string path) { return Wsl("wslpath", "-u", path); }
 
     async Task StartReceiving()
@@ -287,13 +296,17 @@ public sealed class WinDropTray
                 control = LinuxPath(Path.Combine(runtime, "airdrop-lab-control.sh"));
                 string script = LinuxPath(Path.Combine(runtime, "airdrop-lab.sh"));
                 Wsl("bash", control, "available");
-                var state = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(Run(usb, "state")); Dictionary<string, object> target = null;
-                foreach (Dictionary<string, object> device in (IEnumerable)state["Devices"]) if (Convert.ToString(device["InstanceId"]) == @"USB\VID_0BDA&PID_8179\00E04C0001") target = device;
+                var state = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(Run(usb, "state"));
+                var target = AdapterCatalog.Select((IEnumerable)state["Devices"], settings.AdapterInstanceId, ResourceText("adapters.json"));
                 if (target == null || string.IsNullOrEmpty(Convert.ToString(target["BusId"]))) throw new Exception("adapter-missing");
+                sessionDevice = Convert.ToString(target["InstanceId"]);
+                var identity = AdapterIdentity.Parse(sessionDevice);
+                var profile = AdapterCatalog.Profile(sessionDevice, ResourceText("adapters.json"));
+                if (profile == null) throw new Exception("This adapter is not supported by the installed radio driver package.");
                 bus = Convert.ToString(target["BusId"]);
-                if (!string.IsNullOrEmpty(Convert.ToString(target["ClientIPAddress"]))) Wsl("bash", control, "attached"); else Run(usb, "attach", "--wsl", "AirDropLab", "--busid", bus);
+                if (!string.IsNullOrEmpty(Convert.ToString(target["ClientIPAddress"]))) Wsl("bash", control, "attached", identity.Vendor, identity.Product, identity.Serial); else Run(usb, "attach", "--wsl", settings.RuntimeDistro, "--busid", bus);
                 ownsSession = true; token = Guid.NewGuid().ToString("N"); Directory.CreateDirectory(saveFolder);
-                var info = Info("wsl.exe", "-d", "AirDropLab", "-u", "root", "--exec", "setsid", "--wait", "bash", script, "8188eu", "--ui-events", LinuxPath(saveFolder), token);
+                var info = Info("wsl.exe", "-d", settings.RuntimeDistro, "-u", "root", "--exec", "setsid", "--wait", "bash", script, profile.Driver, "--ui-events", LinuxPath(saveFolder), token, identity.Vendor, identity.Product, identity.Serial);
                 info.RedirectStandardInput = true;
                 var child = new Process { StartInfo = info, EnableRaisingEvents = true }; receiver = child;
                 child.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) OnUi(delegate { if (child == receiver) HandleLine(e.Data); }); };
@@ -302,7 +315,7 @@ public sealed class WinDropTray
                 child.Start(); child.StandardInput.AutoFlush = true; child.BeginOutputReadLine(); child.BeginErrorReadLine();
             });
         }
-        catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving", ex.Message.Contains("adapter-missing") ? "Plug in the TP-Link adapter. WinDrop will try again." : "Check About → Open diagnostics, then try Start again.", false); }
+        catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving", ex.Message.Contains("adapter-missing") ? "Plug in your selected USB adapter. WinDrop will try again." : "Open Settings → Adapter setup to check this PC, or About → Open diagnostics.", false); }
         finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; }
         if (failed && ownsSession) await StopReceiving();
         if (receiver != null && receiver.HasExited && ownsSession) await StopReceiving();
@@ -318,7 +331,7 @@ public sealed class WinDropTray
                 Wsl("bash", control, "stop", token);
                 if (receiver != null && !receiver.HasExited && !receiver.WaitForExit(10000)) throw new Exception("Receiver has not stopped yet.");
                 var state = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(Run(usb, "state"));
-                foreach (Dictionary<string, object> device in (IEnumerable)state["Devices"]) if (Convert.ToString(device["InstanceId"]) == @"USB\VID_0BDA&PID_8179\00E04C0001" && !string.IsNullOrEmpty(Convert.ToString(device["ClientIPAddress"]))) Run(usb, "detach", "--busid", Convert.ToString(device["BusId"]));
+                foreach (Dictionary<string, object> device in (IEnumerable)state["Devices"]) if (string.Equals(Convert.ToString(device["InstanceId"]), sessionDevice, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Convert.ToString(device["ClientIPAddress"]))) Run(usb, "detach", "--busid", Convert.ToString(device["BusId"]));
             });
             ownsSession = false; if (receiver != null) { receiver.Dispose(); receiver = null; }
             SetStatus("Receiving is off", "Start receiving whenever you're ready.", false);
@@ -438,7 +451,7 @@ public sealed class WinDropTray
                 {
                     try
                     {
-                        var info = Info("wsl.exe", "-d", "AirDropLab", "-u", "root", "--exec", "python3", LinuxPath(Path.Combine(runtime, "render-preview.py"))); info.RedirectStandardInput = true;
+                        var info = Info("wsl.exe", "-d", settings.RuntimeDistro, "-u", "root", "--exec", "python3", LinuxPath(Path.Combine(runtime, "render-preview.py"))); info.RedirectStandardInput = true;
                         using (var process = Process.Start(info))
                         {
                             Task<string> output = process.StandardOutput.ReadToEndAsync(), errors = process.StandardError.ReadToEndAsync();
@@ -474,10 +487,16 @@ public sealed class WinDropTray
         Uri uri; if (!Uri.TryCreate(activation, UriKind.Absolute, out uri) || uri.Scheme != "windrop") return;
         Log("Notification activation: " + uri.Host);
         if (uri.Host == "show") { ShowWindow(); return; }
+        if (uri.Host == "quit") { QuitFromActivation(); return; }
         if (incoming == null) return;
         string expected = "?id=" + Convert.ToString(incoming["id"]);
         if (uri.Query != expected) return;
         if (uri.Host == "accept") Decide(true); else if (uri.Host == "decline") Decide(false);
+    }
+    async void QuitFromActivation()
+    {
+        if (busy) return; receivingIntent = false; await StopReceiving(); if (ownsSession) return;
+        quitting = true; tray.Dispose(); Application.Current.Shutdown();
     }
     static bool ForwardActivation(string activation)
     {
