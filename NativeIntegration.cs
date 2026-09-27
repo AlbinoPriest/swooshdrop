@@ -7,6 +7,7 @@ using Microsoft.Win32;
 
 public static class NativeIntegration
 {
+    const string ToastClassId = "{74331E92-9FD9-4BEE-8563-83110C44FF39}";
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
     [DllImport("shell32.dll")] static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
     public static void Register(string executable)
@@ -19,7 +20,16 @@ public static class NativeIntegration
             using (var icon = protocol.CreateSubKey("DefaultIcon")) icon.SetValue("", "\"" + executable + "\",0");
         }
         using (var app = Registry.CurrentUser.CreateSubKey(@"Software\Classes\AppUserModelId\WinDrop.PC"))
-        { app.SetValue("DisplayName", "WinDrop"); app.SetValue("IconUri", executable); }
+        { app.SetValue("DisplayName", "WinDrop"); app.SetValue("IconUri", executable); app.SetValue("CustomActivator", ToastClassId); }
+        using (var callback = Registry.CurrentUser.CreateSubKey(@"Software\Classes\CLSID\" + ToastClassId))
+        {
+            callback.SetValue("", "WinDrop notification callback");
+            using (var server = callback.CreateSubKey("LocalServer32"))
+            {
+                server.SetValue("", "\"" + executable + "\" --toast-server");
+                server.SetValue("ServerExecutable", executable);
+            }
+        }
         string shortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk");
         var shell = (IShellLinkW)new ShellLink();
         try
@@ -28,6 +38,10 @@ public static class NativeIntegration
             var store = (IPropertyStore)shell;
             var key = new PropertyKey { FormatId = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), PropertyId = 5 };
             var value = new PropVariant { Type = 31, Pointer = Marshal.StringToCoTaskMemUni("WinDrop.PC") };
+            try { store.SetValue(ref key, ref value); store.Commit(); } finally { Marshal.FreeCoTaskMem(value.Pointer); }
+            key.PropertyId = 26;
+            value = new PropVariant { Type = 72, Pointer = Marshal.AllocCoTaskMem(16) };
+            Marshal.Copy(new Guid(ToastClassId).ToByteArray(), 0, value.Pointer, 16);
             try { store.SetValue(ref key, ref value); store.Commit(); } finally { Marshal.FreeCoTaskMem(value.Pointer); }
             ((IPersistFile)shell).Save(shortcut, true);
         }

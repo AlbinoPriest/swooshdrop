@@ -24,8 +24,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("WinDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("WinDrop PC")]
-[assembly: AssemblyVersion("0.2.0.0")]
-[assembly: AssemblyFileVersion("0.2.0.0")]
+[assembly: AssemblyVersion("0.2.1.0")]
+[assembly: AssemblyFileVersion("0.2.1.0")]
 
 public class Preferences
 {
@@ -78,6 +78,7 @@ public sealed class WinDropTray
     [STAThread]
     public static void Main(string[] args)
     {
+        if (Array.IndexOf(args, "--toast-server") >= 0) { RunToastServer(); return; }
         bool render = Array.IndexOf(args, "--render") >= 0 || Array.IndexOf(args, "--render-popup") >= 0;
         bool created;
         using (var mutex = new Mutex(true, render ? "Local\\WinDrop.PC.Render" : "Local\\WinDrop.PC.Instance", out created))
@@ -100,6 +101,8 @@ public sealed class WinDropTray
             app.ExtractRuntime();
             try { NativeIntegration.Register(app.exe); } catch (Exception ex) { app.Log("Windows registration: " + ex.Message); }
             app.ListenForActivation();
+            ToastActivation.OnActivated = delegate(string activation) { app.OnUi(delegate { app.Activate(activation); }); };
+            int toastCookie = ToastActivation.RegisterServer();
             string import = Option(args, "--import"); if (!string.IsNullOrEmpty(import)) app.ImportFolder(import);
             app.QueueMissingPreviews();
             bool background = Array.IndexOf(args, "--background") >= 0;
@@ -109,7 +112,7 @@ public sealed class WinDropTray
                 if (settingsStart(app, args)) { app.receivingIntent = true; await app.StartReceiving(); }
                 if (args.Length > 0 && args[0].StartsWith("windrop://", StringComparison.OrdinalIgnoreCase)) app.Activate(args[0]);
             }), DispatcherPriority.ApplicationIdle);
-            application.Run();
+            try { application.Run(); } finally { ToastActivation.UnregisterServer(toastCookie); }
         }
     }
 
@@ -462,9 +465,31 @@ public sealed class WinDropTray
         if (uri.Query != expected) return;
         if (uri.Host == "accept") Decide(true); else if (uri.Host == "decline") Decide(false);
     }
-    static void ForwardActivation(string activation)
+    static bool ForwardActivation(string activation)
     {
-        try { using (var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out)) { pipe.Connect(1500); using (var writer = new StreamWriter(pipe)) { writer.WriteLine(activation); writer.Flush(); } } } catch { }
+        try { using (var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out)) { pipe.Connect(1500); using (var writer = new StreamWriter(pipe)) { writer.WriteLine(activation); writer.Flush(); } } return true; } catch { return false; }
+    }
+    static void RunToastServer()
+    {
+        var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+        timeout.Tick += delegate { application.Shutdown(); }; timeout.Start();
+        ToastActivation.OnActivated = delegate(string activation)
+        {
+            Task.Run(delegate
+            {
+                try
+                {
+                    Uri uri;
+                    if (Uri.TryCreate(activation, UriKind.Absolute, out uri) && uri.Scheme == "windrop" && (uri.Host == "show" || uri.Host == "accept" || uri.Host == "decline"))
+                        if (!ForwardActivation(activation))
+                            Process.Start(new ProcessStartInfo(Assembly.GetExecutingAssembly().Location, Quote("windrop://show")) { UseShellExecute = false, CreateNoWindow = true });
+                }
+                finally { application.Dispatcher.BeginInvoke(new Action(delegate { application.Shutdown(); })); }
+            });
+        };
+        int cookie = ToastActivation.RegisterServer();
+        try { application.Run(); } finally { ToastActivation.UnregisterServer(cookie); }
     }
     void ListenForActivation()
     {

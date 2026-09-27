@@ -6,7 +6,7 @@ $null = [Windows.UI.Notifications.NotificationSetting, Windows.UI.Notifications,
 $null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime]
 $document = New-Object System.Xml.XmlDocument
 $toast = $document.CreateElement('toast'); $document.AppendChild($toast) | Out-Null
-$toast.SetAttribute('activationType','protocol'); $toast.SetAttribute('launch','windrop://show')
+$toast.SetAttribute('activationType','foreground'); $toast.SetAttribute('launch','windrop://show')
 $visual = $document.CreateElement('visual'); $toast.AppendChild($visual) | Out-Null
 $binding = $document.CreateElement('binding'); $binding.SetAttribute('template','ToastGeneric'); $visual.AppendChild($binding) | Out-Null
 foreach ($line in @($request.title, $request.body)) { $text = $document.CreateElement('text'); $text.InnerText = [string]$line; $binding.AppendChild($text) | Out-Null }
@@ -15,7 +15,7 @@ if ($request.image -and (Test-Path -LiteralPath $request.image)) {
 }
 if ($request.id) {
     $actions = $document.CreateElement('actions'); $toast.AppendChild($actions) | Out-Null
-    foreach ($verb in @('Accept','Decline')) { $action = $document.CreateElement('action'); $action.SetAttribute('content',$verb); $action.SetAttribute('activationType','protocol'); $action.SetAttribute('arguments',('windrop://' + $verb.ToLowerInvariant() + '?id=' + $request.id)); $actions.AppendChild($action) | Out-Null }
+    foreach ($verb in @('Accept','Decline')) { $action = $document.CreateElement('action'); $action.SetAttribute('content',$verb); $action.SetAttribute('activationType','foreground'); $action.SetAttribute('arguments',('windrop://' + $verb.ToLowerInvariant() + '?id=' + $request.id)); $actions.AppendChild($action) | Out-Null }
 }
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument; $xml.LoadXml($document.OuterXml)
 $notification = [Windows.UI.Notifications.ToastNotification]::new($xml)

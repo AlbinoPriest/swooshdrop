@@ -34,7 +34,7 @@ $arguments += '/resource:' + (Join-Path $PSScriptRoot 'ui\TransferPopup.xaml') +
 $arguments += '/resource:' + $iconPng + ',UI.AppIcon.png'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'LICENSE') + ',Notices.App-LICENSE.txt'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'licenses\WinDrop-LICENSE.txt') + ',Notices.Protocol-LICENSE.txt'
-$arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs')
+$arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'ToastActivation.cs')
 & (Join-Path $framework 'csc.exe') @arguments
 if ($LASTEXITCODE -ne 0) { throw 'WinDrop compilation failed.' }
 Get-Item (Join-Path $output 'WinDrop.exe') | Select-Object FullName,Length
