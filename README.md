@@ -2,6 +2,8 @@
 
 Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. Includes a received-files gallery, image and web-address previews, notification approval buttons, automatic opening of accepted links, a tray app, and optional startup at sign-in.
 
+**Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl). WinDrop PC is a working name pending rebranding.
+
 **0.3 is an installer beta.** Download **[WinDropSetup.exe](https://github.com/AlbinoPriest/windrop-pc/releases/tag/v0.3.0)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
 
 ## Requirements and compatibility
@@ -61,6 +63,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDropSetup.ps1
 
 ## Attribution and licenses
 
-The Windows frontend is MIT-licensed integration work. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop); [OWL](https://github.com/seemoo-lab/owl) implements AWDL. This project does not claim to have invented either implementation.
+The Windows frontend, installer, and hardware integration are developed independently for this project. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop), copyright 2026 Uvejs Gjelaj, under the MIT license; [OWL](https://github.com/seemoo-lab/owl) implements AWDL under GPL-3.0. Original copyright and license notices are retained. This project does not claim to have invented either implementation, and its maintainers do not represent the upstream projects.
+
+AirDrop, iPhone, and Windows are third-party product names used to describe compatibility. Their use does not imply endorsement. Our MIT license applies to our original work; bundled components retain their own licenses.
 
 Setup embeds OWL, GPL kernel/driver modules, minimal firmware, notices, and their corresponding source. Those sources are installed under `Sources`. Ubuntu/codec packages are downloaded separately. See [notices](THIRD-PARTY-NOTICES.md) and [pinned source revisions](source-versions.json). Personal media, captures, credentials, logs, and Linux home directories are excluded from packages and source control.
