@@ -1,6 +1,6 @@
 # WinDrop PC
 
-Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. WinDrop 0.2.1 provides a native Windows app, a received-files gallery, image previews, notification approval buttons, and optional startup at sign-in.
+Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. WinDrop 0.2.2 provides a native Windows app, a received-files gallery, image previews, notification approval buttons, and optional startup at sign-in.
 
 This is a hardware beta for a provisioned PC. It dedicates a TP-Link TL-WN725N USB adapter to the separate **AirDropLab** WSL distribution. OWL supplies AWDL, WinDrop handles AirDrop, and the Windows app saves files. The EXE embeds the protocol runtime and app resources; usbipd-win, WSL, Linux image codecs, and the matching radio driver remain separate prerequisites. See [provisioning notes](docs/SETUP.md).
 
@@ -13,7 +13,7 @@ This is a hardware beta for a provisioned PC. It dedicates a TP-Link TL-WN725N U
 
 Files default to **Downloads\WinDrop**. Settings lets you change this folder, select receiving on launch, and enable **Start WinDrop when I sign in to Windows**. Sign-in startup is off unless enabled. Closing the window leaves WinDrop in the tray; **Stop receiving** returns the adapter to Windows, and tray **Quit** stops receiving and exits.
 
-Photo thumbnails are separate cached previews. Received files are not resized or recompressed by WinDrop. The app requests unconverted media; the sender ultimately controls what it shares. Web links are shown before approval, stored as text files, and opened only when you click **Open**. History, settings, previews, and diagnostics live under `%LOCALAPPDATA%\Programs\WinDrop\Data`.
+Photo thumbnails are separate cached previews. Received files are not resized or recompressed by WinDrop. The app requests unconverted media; the sender ultimately controls what it shares. Web links are shown before approval, stored as text files, and opened in the default browser after an accepted transfer finishes. Disable **Open accepted web links in my browser** in Settings to save links without automatically opening them; **Open** remains available in the gallery. History, settings, previews, and diagnostics live under `%LOCALAPPDATA%\Programs\WinDrop\Data`.
 
 Discovery is still intermittent and can take time. Contacts Only and Apple identity integration are not implemented; sender names are unverified. Native notifications depend on Windows notification settings. A custom approval popup is used when notification delivery reports an error or previews are disabled.
 

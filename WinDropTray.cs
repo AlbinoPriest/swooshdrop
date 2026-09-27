@@ -24,15 +24,16 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("WinDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("WinDrop PC")]
-[assembly: AssemblyVersion("0.2.1.0")]
-[assembly: AssemblyFileVersion("0.2.1.0")]
+[assembly: AssemblyVersion("0.2.2.0")]
+[assembly: AssemblyFileVersion("0.2.2.0")]
 
 public class Preferences
 {
     public string SaveFolder { get; set; }
     public bool ReceiveOnLaunch { get; set; }
     public bool Notifications { get; set; }
-    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WinDrop"); ReceiveOnLaunch = true; Notifications = true; }
+    public bool OpenLinksOnReceive { get; set; }
+    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WinDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; }
 }
 
 public class TransferItem : INotifyPropertyChanged
@@ -146,6 +147,7 @@ public sealed class WinDropTray
         Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled();
         Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked = settings.ReceiveOnLaunch;
         Find<CheckBox>("NotificationsCheck").IsChecked = settings.Notifications;
+        Find<CheckBox>("OpenLinksCheck").IsChecked = settings.OpenLinksOnReceive;
         Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder;
         loadingSettings = false;
         Find<CheckBox>("AutostartCheck").Click += delegate
@@ -156,6 +158,7 @@ public sealed class WinDropTray
         };
         Find<CheckBox>("ReceiveOnLaunchCheck").Click += delegate { settings.ReceiveOnLaunch = Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked == true; SaveSettings(); };
         Find<CheckBox>("NotificationsCheck").Click += delegate { settings.Notifications = Find<CheckBox>("NotificationsCheck").IsChecked == true; SaveSettings(); };
+        Find<CheckBox>("OpenLinksCheck").Click += delegate { settings.OpenLinksOnReceive = Find<CheckBox>("OpenLinksCheck").IsChecked == true; SaveSettings(); };
         Find<Button>("ChangeFolderButton").Click += delegate
         {
             using (var picker = new Forms.FolderBrowserDialog { Description = "Choose where WinDrop saves received files", SelectedPath = settings.SaveFolder })
@@ -232,12 +235,19 @@ public sealed class WinDropTray
             if (Convert.ToString(button.Content) == "Show in folder") Process.Start("explorer.exe", "/select," + Quote(item.Path));
             else if (!string.IsNullOrEmpty(item.Link))
             {
-                Uri url; if (Uri.TryCreate(item.Link, UriKind.Absolute, out url) && (url.Scheme == "http" || url.Scheme == "https")) Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
+                OpenLink(item.Link);
             }
             else if (File.Exists(item.Path)) Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
             else MessageBox.Show("This file was moved or deleted. You can still see its transfer details here.", "WinDrop");
         }
         catch (Exception ex) { Log("Open: " + ex.Message); MessageBox.Show("Windows couldn't open this item.", "WinDrop"); }
+    }
+    static void OpenLink(string link)
+    {
+        Uri url;
+        if (!Uri.TryCreate(link, UriKind.Absolute, out url) || (url.Scheme != "http" && url.Scheme != "https") || !string.IsNullOrEmpty(url.UserInfo))
+            throw new InvalidOperationException("Only HTTP and HTTPS web links can be opened.");
+        Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
     }
 
     static string Quote(string value)
@@ -390,6 +400,10 @@ public sealed class WinDropTray
         SaveHistory(); UpdateCount(); SetStatus("Ready for your next drop", "Saved to " + settings.SaveFolder, true);
         Notify(links.Length > 0 ? "Link received" : "AirDrop received", links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), incomingPreview, null, null);
         incomingPreview = null; QueueMissingPreviews();
+        if (settings.OpenLinksOnReceive && added.Count > 0)
+            foreach (string link in new HashSet<string>(links, StringComparer.Ordinal))
+                try { OpenLink(link); Log("Opened an accepted web link in the default browser."); }
+                catch (Exception ex) { Log("Open received link: " + ex.Message); SetStatus("Link saved", "Windows couldn't open your browser. Use Open in the gallery to try again.", true); }
     }
     static string WindowsPath(string linux)
     { if (linux.StartsWith("/mnt/") && linux.Length > 7 && char.IsLetter(linux[5]) && linux[6] == '/') return char.ToUpperInvariant(linux[5]) + ":\\" + linux.Substring(7).Replace('/', '\\'); return linux; }
