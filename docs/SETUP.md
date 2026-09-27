@@ -1,6 +1,6 @@
 # Provisioning notes
 
-For ordinary installation use **WinDropSetup.exe** and the [distribution guide](DISTRIBUTION.md). These notes describe the original developer build environment. Shipping builds use `scripts/build-extra-radio-modules.sh`, `scripts/build-runtime-payload.sh`, and `scripts/build-corresponding-source.sh`, then `Build-WinDropSetup.ps1`. MediaTek adapters remain experimental.
+For ordinary installation use **SwooshDropSetup.exe** and the [distribution guide](DISTRIBUTION.md). These notes describe the original developer build environment. Shipping builds use `scripts/build-extra-radio-modules.sh`, `scripts/build-runtime-payload.sh`, and `scripts/build-corresponding-source.sh`, then `Build-WinDropSetup.ps1`. MediaTek adapters remain experimental.
 
 The working machine was provisioned interactively. These notes preserve the sources and build steps; they are not an unattended installer or a claim that every WSL kernel/adapter works.
 
@@ -83,7 +83,7 @@ WINDROP_PYTHON=/usr/bin/python3 dotnet test \
 
 Some upstream archive oracle tests look for a tool named `tar.exe`. To exercise those on Linux, supply a test-only `tar.exe` symlink to `bsdtar` in a directory added to the test process's PATH. The normal `tar` command does not satisfy that check. The prototype test results included the Python and libarchive oracles.
 
-Build with `Build-WinDrop.ps1`, then run `Install-WinDrop.ps1 -Launch` in Windows PowerShell 5.1. Windows .NET Framework 4.8 supplies WPF and the compiler; a Windows .NET SDK is unnecessary. The installer creates desktop/Start menu shortcuts, a COM notification callback CLSID, and an optional `windrop:` URI handler. Native notifications use foreground activation and the COM callback, not protocol launching. The running app keeps its class factory registered while receiving; callbacks dispatch to its UI thread. Files default to Downloads\WinDrop. Optional sign-in startup is controlled in Settings and uses the current user's Run registry key. Start only one receiver; the Linux helper also uses an exclusive session lock.
+Build with `Build-WinDrop.ps1`, then run `Install-WinDrop.ps1 -Launch` in Windows PowerShell 5.1. Windows .NET Framework 4.8 supplies WPF and the compiler; a Windows .NET SDK is unnecessary. The installer creates desktop/Start menu shortcuts, a COM notification callback CLSID, and retains the internal `windrop:` URI handler for compatibility. Native notifications use foreground activation and the COM callback, not protocol launching. The running app keeps its class factory registered while receiving; callbacks dispatch to its UI thread. New installs save to Downloads\SwooshDrop; existing installations keep their selected folder. Optional sign-in startup is controlled in Settings and uses the current user's Run registry key. Start only one receiver; the Linux helper also uses an exclusive session lock.
 
 Relay/control listeners bind to IPv6 loopback. AirDrop listens on the AWDL interface. Transfer consent is essential: the display name is supplied by the sender and is not verified Apple identity. The app requires an explicit decision for each transfer and rejects unanswered requests.
 

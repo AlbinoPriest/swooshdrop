@@ -15,22 +15,22 @@ public static class NativeIntegration
         SetCurrentProcessExplicitAppUserModelID("WinDrop.PC");
         using (var protocol = Registry.CurrentUser.CreateSubKey(@"Software\Classes\windrop"))
         {
-            protocol.SetValue("", "URL:WinDrop"); protocol.SetValue("URL Protocol", "");
+            protocol.SetValue("", "URL:SwooshDrop"); protocol.SetValue("URL Protocol", "");
             using (var command = protocol.CreateSubKey(@"shell\open\command")) command.SetValue("", "\"" + executable + "\" \"%1\"");
             using (var icon = protocol.CreateSubKey("DefaultIcon")) icon.SetValue("", "\"" + executable + "\",0");
         }
         using (var app = Registry.CurrentUser.CreateSubKey(@"Software\Classes\AppUserModelId\WinDrop.PC"))
-        { app.SetValue("DisplayName", "WinDrop"); app.SetValue("IconUri", executable); app.SetValue("CustomActivator", ToastClassId); }
+        { app.SetValue("DisplayName", "SwooshDrop"); app.SetValue("IconUri", executable); app.SetValue("CustomActivator", ToastClassId); }
         using (var callback = Registry.CurrentUser.CreateSubKey(@"Software\Classes\CLSID\" + ToastClassId))
         {
-            callback.SetValue("", "WinDrop notification callback");
+            callback.SetValue("", "SwooshDrop notification callback");
             using (var server = callback.CreateSubKey("LocalServer32"))
             {
                 server.SetValue("", "\"" + executable + "\" --toast-server");
                 server.SetValue("ServerExecutable", executable);
             }
         }
-        string shortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk");
+        string shortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "SwooshDrop.lnk");
         var shell = (IShellLinkW)new ShellLink();
         try
         {
@@ -50,11 +50,11 @@ public static class NativeIntegration
         SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);
     }
     public static bool IsAutostartEnabled()
-    { using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return key != null && key.GetValue("WinDrop") != null; }
+    { using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return key != null && (key.GetValue("SwooshDrop") != null || key.GetValue("WinDrop") != null); }
     public static void SetAutostart(string executable, bool enabled)
     {
         using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
-        { if (enabled) key.SetValue("WinDrop", "\"" + executable + "\" --background"); else key.DeleteValue("WinDrop", false); }
+        { key.DeleteValue("WinDrop", false); if (enabled) key.SetValue("SwooshDrop", "\"" + executable + "\" --background"); else key.DeleteValue("SwooshDrop", false); }
     }
 
     [ComImport, Guid("00021401-0000-0000-C000-000000000046")] class ShellLink { }

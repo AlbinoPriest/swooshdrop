@@ -21,11 +21,11 @@ using System.Windows.Threading;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
-[assembly: AssemblyTitle("WinDrop")]
+[assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
-[assembly: AssemblyProduct("WinDrop PC")]
-[assembly: AssemblyVersion("0.3.0.0")]
-[assembly: AssemblyFileVersion("0.3.0.0")]
+[assembly: AssemblyProduct("SwooshDrop")]
+[assembly: AssemblyVersion("0.3.1.0")]
+[assembly: AssemblyFileVersion("0.3.1.0")]
 
 public class Preferences
 {
@@ -35,7 +35,7 @@ public class Preferences
     public bool OpenLinksOnReceive { get; set; }
     public string RuntimeDistro { get; set; }
     public string AdapterInstanceId { get; set; }
-    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WinDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; RuntimeDistro = "WinDropRuntime"; }
+    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SwooshDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; RuntimeDistro = "WinDropRuntime"; }
 }
 
 public class TransferItem : INotifyPropertyChanged
@@ -145,12 +145,12 @@ public sealed class WinDropTray
         Find<Button>("DiagnosticsButton").Click += delegate { Directory.CreateDirectory(Path.Combine(data, "Logs")); Process.Start("explorer.exe", Quote(Path.Combine(data, "Logs"))); };
         Find<Button>("SetupButton").Click += async delegate
         {
-            string setup = Path.Combine(Path.GetDirectoryName(exe), "WinDropSetup.exe");
-            if (!File.Exists(setup)) { MessageBox.Show("Download and run WinDropSetup.exe to set up this PC or change its adapter.", "WinDrop Setup"); return; }
+            string setup = Path.Combine(Path.GetDirectoryName(exe), "SwooshDropSetup.exe");
+            if (!File.Exists(setup)) { MessageBox.Show("Download and run SwooshDropSetup.exe to set up this PC or change its adapter.", "SwooshDrop Setup"); return; }
             receivingIntent = false; await StopReceiving(); if (ownsSession) return;
             Process.Start(setup); quitting = true; tray.Dispose(); Application.Current.Shutdown();
         };
-        Find<Button>("LicensesButton").Click += delegate { MessageBox.Show(ResourceText("App-LICENSE.txt") + "\n\nWinDrop protocol dependency\n\n" + ResourceText("Protocol-LICENSE.txt"), "WinDrop licenses"); };
+        Find<Button>("LicensesButton").Click += delegate { MessageBox.Show(ResourceText("App-LICENSE.txt") + "\n\nWinDrop protocol dependency\n\n" + ResourceText("Protocol-LICENSE.txt"), "SwooshDrop licenses"); };
         Find<ItemsControl>("Transfers").AddHandler(Button.ClickEvent, new RoutedEventHandler(OpenItem));
         loadingSettings = true;
         Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled();
@@ -163,22 +163,22 @@ public sealed class WinDropTray
         {
             if (loadingSettings) return;
             try { NativeIntegration.SetAutostart(exe, Find<CheckBox>("AutostartCheck").IsChecked == true); }
-            catch (Exception ex) { Log("Autostart: " + ex.Message); Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled(); MessageBox.Show("Windows could not save the startup setting.", "WinDrop"); }
+            catch (Exception ex) { Log("Autostart: " + ex.Message); Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled(); MessageBox.Show("Windows could not save the startup setting.", "SwooshDrop"); }
         };
         Find<CheckBox>("ReceiveOnLaunchCheck").Click += delegate { settings.ReceiveOnLaunch = Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked == true; SaveSettings(); };
         Find<CheckBox>("NotificationsCheck").Click += delegate { settings.Notifications = Find<CheckBox>("NotificationsCheck").IsChecked == true; SaveSettings(); };
         Find<CheckBox>("OpenLinksCheck").Click += delegate { settings.OpenLinksOnReceive = Find<CheckBox>("OpenLinksCheck").IsChecked == true; SaveSettings(); };
         Find<Button>("ChangeFolderButton").Click += delegate
         {
-            using (var picker = new Forms.FolderBrowserDialog { Description = "Choose where WinDrop saves received files", SelectedPath = settings.SaveFolder })
+            using (var picker = new Forms.FolderBrowserDialog { Description = "Choose where SwooshDrop saves received files", SelectedPath = settings.SaveFolder })
                 if (picker.ShowDialog() == Forms.DialogResult.OK) { settings.SaveFolder = picker.SelectedPath; Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder; SaveSettings(); }
         };
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
         {
-            tray.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exe); tray.Text = "WinDrop"; tray.Visible = true;
+            tray.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exe); tray.Text = "SwooshDrop"; tray.Visible = true;
             var menu = new Forms.ContextMenuStrip();
-            menu.Items.Add("Open WinDrop", null, delegate { ShowWindow(); });
+            menu.Items.Add("Open SwooshDrop", null, delegate { ShowWindow(); });
             menu.Items.Add("Open received folder", null, delegate { OpenFolder(); });
             menu.Items.Add("Start receiving", null, async delegate { receivingIntent = true; await StartReceiving(); });
             menu.Items.Add("Stop receiving", null, async delegate { receivingIntent = false; await StopReceiving(); });
@@ -206,7 +206,7 @@ public sealed class WinDropTray
         Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#21AC83" : "#9AA8BE"));
         Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving";
         Find<Button>("ReceiveButton").IsEnabled = !busy;
-        if (!rendering) tray.Text = "WinDrop · " + title.Substring(0, Math.Min(48, title.Length));
+        if (!rendering) tray.Text = "SwooshDrop · " + title.Substring(0, Math.Min(48, title.Length));
     }
     void OnUi(Action action) { if (!quitting) window.Dispatcher.BeginInvoke(action); }
     void Log(string text)
@@ -247,9 +247,9 @@ public sealed class WinDropTray
                 OpenLink(item.Link);
             }
             else if (File.Exists(item.Path)) Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
-            else MessageBox.Show("This file was moved or deleted. You can still see its transfer details here.", "WinDrop");
+            else MessageBox.Show("This file was moved or deleted. You can still see its transfer details here.", "SwooshDrop");
         }
-        catch (Exception ex) { Log("Open: " + ex.Message); MessageBox.Show("Windows couldn't open this item.", "WinDrop"); }
+        catch (Exception ex) { Log("Open: " + ex.Message); MessageBox.Show("Windows couldn't open this item.", "SwooshDrop"); }
     }
     static void OpenLink(string link)
     {
@@ -315,7 +315,7 @@ public sealed class WinDropTray
                 child.Start(); child.StandardInput.AutoFlush = true; child.BeginOutputReadLine(); child.BeginErrorReadLine();
             });
         }
-        catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving", ex.Message.Contains("adapter-missing") ? "Plug in your selected USB adapter. WinDrop will try again." : "Open Settings → Adapter setup to check this PC, or About → Open diagnostics.", false); }
+        catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving", ex.Message.Contains("adapter-missing") ? "Plug in your selected USB adapter. SwooshDrop will try again." : "Open Settings → Adapter setup to check this PC, or About → Open diagnostics.", false); }
         finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; }
         if (failed && ownsSession) await StopReceiving();
         if (receiver != null && receiver.HasExited && ownsSession) await StopReceiving();
@@ -346,7 +346,7 @@ public sealed class WinDropTray
         try
         {
             var item = json.Deserialize<Dictionary<string, object>>(line); string kind = Convert.ToString(item["kind"]);
-            if (kind == "ready") SetStatus("Ready to receive", "On iPhone: Share → AirDrop → WinDrop PC. Discovery may take a moment.", true);
+            if (kind == "ready") SetStatus("Ready to receive", "On iPhone: Share → AirDrop → SwooshDrop. Discovery may take a moment.", true);
             else if (kind == "log") Log(Convert.ToString(item["message"]));
             else if (kind == "consent") ReceiveConsent(item);
             else if (kind == "completed") Complete(item);
@@ -393,7 +393,7 @@ public sealed class WinDropTray
         catch (Exception ex) { Log("Consent: " + ex.Message); accepted = false; }
         incoming = null; if (popup != null) { popup.Close(); popup = null; }
         Find<Border>("PendingBanner").Visibility = Visibility.Collapsed;
-        SetStatus(accepted ? "Receiving your drop…" : "Ready to receive", accepted ? "Saving the original files to your received folder." : "On iPhone: Share → AirDrop → WinDrop PC.", true);
+        SetStatus(accepted ? "Receiving your drop…" : "Ready to receive", accepted ? "Saving the original files to your received folder." : "On iPhone: Share → AirDrop → SwooshDrop.", true);
     }
     void Complete(Dictionary<string, object> eventItem)
     {

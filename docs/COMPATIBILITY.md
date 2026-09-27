@@ -12,7 +12,7 @@ The radio needs monitor mode and raw Wi-Fi frame transmission for OWL/AWDL. Chip
 
 The 86 exact device IDs and selected drivers are in [`adapters.json`](../adapters.json). Manufacturer names can hide different chipsets across hardware revisions. Setup matches USB vendor/product IDs. Two RTL8723BU IDs are excluded because their Bluetooth firmware variant is not included. A catalog match is not proof of successful AirDrop.
 
-Only one receiver may run across WSL distributions. A shared lock prevents competing sessions. WinDrop validates the selected USB identity and rejects ambiguous Linux matches before rebinding radios. It stores the Windows instance identity rather than a hard-coded test-device serial. Adapters without genuine USB serials may need selecting again after changing ports.
+Only one receiver may run across WSL distributions. A shared lock prevents competing sessions. SwooshDrop validates the selected USB identity and rejects ambiguous Linux matches before rebinding radios. It stores the Windows instance identity rather than a hard-coded test-device serial. Adapters without genuine USB serials may need selecting again after changing ports.
 
 The selected adapter is unavailable to Windows while attached to WSL. Use a separate internet connection. Built-in PCI Wi-Fi, sharing the Windows internet adapter, arbitrary USB adapters, ARM, 32-bit PCs, emulated radios, and Contacts Only are not supported by this beta.
 

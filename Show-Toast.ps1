@@ -19,9 +19,9 @@ if ($request.id) {
 }
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument; $xml.LoadXml($document.OuterXml)
 $notification = [Windows.UI.Notifications.ToastNotification]::new($xml)
-$notification.Tag = [string]$request.tag; $notification.Group = 'WinDrop'
+$notification.Tag = [string]$request.tag; $notification.Group = 'SwooshDrop'
 $notification.ExpirationTime = [DateTimeOffset]::Now.AddSeconds(55)
 $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('WinDrop.PC')
 $setting = $notifier.Setting
-if ($null -ne $setting -and [int]$setting -ne 0) { throw 'Windows notifications are disabled for WinDrop.' }
+if ($null -ne $setting -and [int]$setting -ne 0) { throw 'Windows notifications are disabled for SwooshDrop.' }
 $notifier.Show($notification)

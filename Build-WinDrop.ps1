@@ -21,7 +21,7 @@ $writer.Write([uint16]0); $writer.Write([uint16]1); $writer.Write([uint16]1)
 $writer.Write([byte]64); $writer.Write([byte]64); $writer.Write([byte]0); $writer.Write([byte]0)
 $writer.Write([uint16]1); $writer.Write([uint16]32); $writer.Write([uint32]$imageBytes.Length); $writer.Write([uint32]22); $writer.Write($imageBytes); $writer.Dispose()
 $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
-$arguments = @('/nologo','/target:winexe','/platform:x64','/optimize+',('/out:' + (Join-Path $output 'WinDrop.exe')),('/win32manifest:' + (Join-Path $PSScriptRoot 'app.manifest')),('/win32icon:' + $iconFile))
+$arguments = @('/nologo','/target:winexe','/platform:x64','/optimize+',('/out:' + (Join-Path $output 'SwooshDrop.exe')),('/win32manifest:' + (Join-Path $PSScriptRoot 'app.manifest')),('/win32icon:' + $iconFile))
 foreach ($assembly in @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Web.Extensions.dll','System.Xaml.dll','WPF\WindowsBase.dll','WPF\PresentationCore.dll','WPF\PresentationFramework.dll')) { $arguments += '/reference:' + (Join-Path $framework $assembly) }
 foreach ($resource in @('airdrop-lab.sh','airdrop-lab-control.sh','render-preview.py','Show-Toast.ps1')) { $arguments += '/resource:' + (Join-Path $PSScriptRoot $resource) + ',Runtime.' + $resource }
 foreach ($file in @('windrop.dll','windrop.deps.json','windrop.runtimeconfig.json','WinDrop.Protocol.dll')) {
@@ -37,5 +37,5 @@ $arguments += '/resource:' + (Join-Path $PSScriptRoot 'licenses\WinDrop-LICENSE.
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'adapters.json') + ',Config.adapters.json'
 $arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'ToastActivation.cs'),(Join-Path $PSScriptRoot 'AdapterCatalog.cs')
 & (Join-Path $framework 'csc.exe') @arguments
-if ($LASTEXITCODE -ne 0) { throw 'WinDrop compilation failed.' }
-Get-Item (Join-Path $output 'WinDrop.exe') | Select-Object FullName,Length
+if ($LASTEXITCODE -ne 0) { throw 'SwooshDrop compilation failed.' }
+Get-Item (Join-Path $output 'SwooshDrop.exe') | Select-Object FullName,Length

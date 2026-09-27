@@ -40,7 +40,7 @@ public static class AdapterCatalog
             if (!string.IsNullOrEmpty(selected)) { if (string.Equals(identity, selected, StringComparison.OrdinalIgnoreCase)) return device; continue; }
             try { if (Profile(identity, catalogJson) != null && !string.IsNullOrEmpty(Convert.ToString(device["BusId"]))) supported.Add(device); } catch (ArgumentException) { }
         }
-        if (supported.Count > 1) throw new InvalidOperationException("More than one compatible adapter is connected. Select one in WinDrop Setup.");
+        if (supported.Count > 1) throw new InvalidOperationException("More than one compatible adapter is connected. Select one in SwooshDrop Setup.");
         return supported.Count == 1 ? supported[0] : null;
     }
 }

@@ -1,10 +1,10 @@
-# WinDrop PC
+# SwooshDrop
 
 Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. Includes a received-files gallery, image and web-address previews, notification approval buttons, automatic opening of accepted links, a tray app, and optional startup at sign-in.
 
-**Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl). WinDrop PC is a working name pending rebranding.
+**Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl).
 
-**0.3 is an installer beta.** Download **[WinDropSetup.exe](https://github.com/AlbinoPriest/windrop-pc/releases/tag/v0.3.0)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
+**0.3.1 is an installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.1)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
 
 ## Requirements and compatibility
 
@@ -18,22 +18,22 @@ The catalog contains **86 USB device IDs** covered by bundled Realtek and MediaT
 
 ## Install and receive
 
-1. Run **WinDropSetup.exe**, then **Check prerequisites**. Restart manually if Windows requests it, then rerun setup. Existing WSL distributions and Docker are preserved.
-2. Select your dedicated USB adapter. Setup shows its device ID and tested/experimental status. Choose optional startup, then **Install WinDrop**.
-3. Open WinDrop. On iPhone enable Wi-Fi and Bluetooth, choose **Everyone for 10 Minutes**, then **Share → AirDrop → WinDrop PC**.
+1. Run **SwooshDropSetup.exe**, then **Check prerequisites**. Restart manually if Windows requests it, then rerun setup. Existing WSL distributions and Docker are preserved.
+2. Select your dedicated USB adapter. Setup shows its device ID and tested/experimental status. Choose optional startup, then **Install SwooshDrop**.
+3. Open SwooshDrop. On iPhone enable Wi-Fi and Bluetooth, choose **Everyone for 10 Minutes**, then **Share → AirDrop → SwooshDrop**.
 4. Review the sender and preview and click **Accept** or **Decline** in the notification or app. Unanswered requests expire after 55 seconds. Sender display names are unverified.
 
-Files default to **Downloads\WinDrop**. Thumbnails are separate cached previews. WinDrop does not resize or recompress received file streams; the iPhone controls what it shares. Exact equality with iPhone originals has not been verified by hashes. Accepted HTTP/HTTPS links are saved and open in the default browser; disable that behavior in Settings if desired.
+New installations save files to **Downloads\SwooshDrop** by default; upgrades keep the previously selected folder. Thumbnails are separate cached previews. SwooshDrop does not resize or recompress received file streams; the iPhone controls what it shares. Exact equality with iPhone originals has not been verified by hashes. Accepted HTTP/HTTPS links are saved and open in the default browser; disable that behavior in Settings if desired.
 
-Closing the window leaves WinDrop receiving in the tray. **Stop receiving** returns the adapter to Windows. Tray **Quit** stops the session and exits. **Settings → Adapter setup** stops receiving and opens setup to change hardware or repair the runtime.
+Closing the window leaves SwooshDrop receiving in the tray. **Stop receiving** returns the adapter to Windows. Tray **Quit** stops the session and exits. **Settings → Adapter setup** stops receiving and opens setup to change hardware or repair the runtime.
 
 ## Updates and removal
 
-Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. Remove **WinDrop PC** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
+Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. The existing `%LOCALAPPDATA%\Programs\WinDrop` data folder and `WinDropRuntime` WSL distribution retain their internal names so upgrades do not move or erase existing data. Remove **SwooshDrop** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
 
 ## Validation and limits
 
-Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. This version's setup engine provisioned a clean Ubuntu runtime, installed and launched the app on the development PC, and advertised the receiver through that runtime. Native COM notification callbacks and startup registration were checked again.
+Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime, installed and launched the previous version on the development PC, and advertised the receiver through that runtime. The 0.3.1 rebrand build and setup tests pass; a phone transfer using this build is still unverified.
 
 Discovery remains intermittent. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, reboot recovery, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
 

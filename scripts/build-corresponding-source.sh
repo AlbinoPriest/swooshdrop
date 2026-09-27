@@ -17,7 +17,7 @@ git -C "$lab/windrop" archive 5a5dc52ce6eda298789622cb92d548d64d5673cc | tar -x 
 cp "$repo/patches/prototype-changes.patch" "$stage/windrop/windrop-product.patch"
 cp -a "$repo/scripts" "$repo/licenses" "$repo/docs" "$repo/THIRD-PARTY-NOTICES.md" "$stage/packaging/"
 cat > "$stage/README.txt" <<'EOF'
-Corresponding source for WinDrop PC 0.3.0 runtime.
+Corresponding source for SwooshDrop 0.3.1 runtime.
 Kernel: Microsoft WSL Linux c21a03b2943d147c280bdf32530d4fe6badfd6bd.
 Copy windrop.config to .config, use LOCALVERSION= and make olddefconfig;
 make -j8 vmlinux modules to generate matching symbol versions and modules.
@@ -26,7 +26,7 @@ Vendor driver: apply windrop-compatibility.patch with git apply, then make KSRC=
 OWL: cmake -S owl -B owl/build -DCMAKE_BUILD_TYPE=Release; cmake --build owl/build -j8.
 Ubuntu 24.04 dependencies: build-essential cmake pkg-config libpcap-dev libev-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev flex bison libssl-dev libelf-dev bc dwarves.
 WinDrop protocol: apply windrop-product.patch then dotnet build src/WinDrop.Cli -c Release.
-Licenses are retained within each source tree. The Windows frontend source and release packaging are at https://github.com/AlbinoPriest/windrop-pc.
+Licenses are retained within each source tree. The Windows frontend source and release packaging are at https://github.com/AlbinoPriest/swooshdrop.
 EOF
 tar -C "$stage" -czf "$repo/obj/corresponding-source.tar.gz" .
 echo 'Corresponding source archive ready.'

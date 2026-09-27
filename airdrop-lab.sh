@@ -28,7 +28,7 @@ module_root="$lab/drivers"
 if [[ -d "$module_root/lib/modules/$(uname -r)" ]]; then
     driver=$(modinfo -b "$module_root" -k "$(uname -r)" -n "$driver_module")
 fi
-[[ -f "$driver" ]] || { echo 'No radio driver package matches this WSL kernel. Run WinDrop Setup to check compatibility.' >&2; exit 1; }
+[[ -f "$driver" ]] || { echo 'No radio driver package matches this WSL kernel. Run SwooshDrop Setup to check compatibility.' >&2; exit 1; }
 [[ "$(modinfo -F vermagic "$driver")" == "$(uname -r) "* ]] || { echo 'Radio driver and WSL kernel do not match.' >&2; exit 1; }
 radio=''
 owl_pid=''
@@ -104,7 +104,7 @@ for pass in {1..30}; do
     [[ ${#candidates[@]} -eq 1 ]] && { radio=${candidates[0]}; break; }
     sleep 0.2
 done
-[[ -n "$radio" ]] || { echo 'The selected USB adapter could not start. Check the adapter and driver in WinDrop Setup.' >&2; exit 1; }
+[[ -n "$radio" ]] || { echo 'The selected USB adapter could not start. Check the adapter and driver in SwooshDrop Setup.' >&2; exit 1; }
 restore_firmware
 
 ip link set "$radio" down
@@ -144,8 +144,8 @@ for pass in {1..50}; do
     sleep 0.2
 done
 if [[ "${2:-}" == --ui-events ]]; then
-    dotnet "$out/windrop.dll" receive --bridge ::1 --name 'WinDrop PC' --dir "$destination" --ui-events --preview-decoder "$out/render-preview.py" 2>&1 | tee "$out/logs/receiver.log"
+    dotnet "$out/windrop.dll" receive --bridge ::1 --name 'SwooshDrop' --dir "$destination" --ui-events --preview-decoder "$out/render-preview.py" 2>&1 | tee "$out/logs/receiver.log"
 else
     echo 'Starting receiver. Transfers require approval. This test session stops after 15 minutes.'
-    timeout --foreground 15m dotnet "$lab/windrop/src/WinDrop.Cli/bin/Release/net8.0/windrop.dll" receive --bridge ::1 --name 'WinDrop PC' --dir "$out/received" 2>&1 | tee "$out/logs/receiver.log"
+    timeout --foreground 15m dotnet "$lab/windrop/src/WinDrop.Cli/bin/Release/net8.0/windrop.dll" receive --bridge ::1 --name 'SwooshDrop' --dir "$out/received" 2>&1 | tee "$out/logs/receiver.log"
 fi

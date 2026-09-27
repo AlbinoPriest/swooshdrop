@@ -17,9 +17,9 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("WinDrop Setup")]
-[assembly: AssemblyVersion("0.3.0.0")]
-[assembly: AssemblyFileVersion("0.3.0.0")]
+[assembly: AssemblyTitle("SwooshDrop Setup")]
+[assembly: AssemblyVersion("0.3.1.0")]
+[assembly: AssemblyFileVersion("0.3.1.0")]
 
 public sealed class SetupEngine
 {
@@ -74,7 +74,7 @@ public sealed class SetupEngine
             client.DownloadProgressChanged += delegate(object sender, DownloadProgressChangedEventArgs e) { if ((DateTime.UtcNow - last).TotalSeconds >= 3) { last = DateTime.UtcNow; Report(Path.GetFileName(path) + ": " + e.ProgressPercentage + "% · " + (e.BytesReceived / 1048576) + " MB"); } };
             client.DownloadFileTaskAsync(new Uri(url), partial).GetAwaiter().GetResult();
         }
-        if (!Verified(partial, hash)) { File.Delete(partial); throw new InvalidOperationException("Download checksum did not match. Nothing was installed. The upstream download may have changed; use an updated WinDrop installer."); }
+        if (!Verified(partial, hash)) { File.Delete(partial); throw new InvalidOperationException("Download checksum did not match. Nothing was installed. The upstream download may have changed; use an updated SwooshDrop installer."); }
         if (File.Exists(path)) File.Delete(path); File.Move(partial, path);
     }
     public static void SignedMsi(string path, string hash)
@@ -144,20 +144,20 @@ public sealed class SetupEngine
                 Download("https://github.com/microsoft/WSL/releases/download/2.7.13/wsl.2.7.13.0.x64.msi", Path.Combine(cache, "wsl.msi"), WslHash);
                 code = Elevate("--install-wsl", Path.Combine(cache, "wsl.msi"));
             }
-            if (code == 3010 || KernelVersion() == "") throw new InvalidOperationException("Windows needs a restart, or virtualization needs enabling in BIOS. Restart manually, then run WinDrop Setup again.");
+            if (code == 3010 || KernelVersion() == "") throw new InvalidOperationException("Windows needs a restart, or virtualization needs enabling in BIOS. Restart manually, then run SwooshDrop Setup again.");
         }
         string kernel = KernelVersion();
-        if (kernel != Kernel) throw new InvalidOperationException("Your WSL kernel is " + kernel + ". This beta includes radio drivers for " + Kernel + " only. Update WSL if yours is older, or use a WinDrop release supporting your kernel. Setup will not downgrade or replace an existing kernel.");
+        if (kernel != Kernel) throw new InvalidOperationException("Your WSL kernel is " + kernel + ". This beta includes radio drivers for " + Kernel + " only. Update WSL if yours is older, or use a SwooshDrop release supporting your kernel. Setup will not downgrade or replace an existing kernel.");
         if (!File.Exists(Usb))
         {
             Download("https://github.com/dorssel/usbipd-win/releases/download/v5.3.0/usbipd-win_5.3.0_x64.msi", Path.Combine(cache, "usbipd.msi"), UsbHash);
-            if (Elevate("--install-usb", Path.Combine(cache, "usbipd.msi")) == 3010) throw new InvalidOperationException("USB sharing needs a restart. Restart manually and run WinDrop Setup again.");
+            if (Elevate("--install-usb", Path.Combine(cache, "usbipd.msi")) == 3010) throw new InvalidOperationException("USB sharing needs a restart. Restart manually and run SwooshDrop Setup again.");
         }
         Report("Prerequisites ready. Select your dedicated USB Wi-Fi adapter.");
     }
     public void Install(string instance, bool autostart)
     {
-        if (Process.GetProcessesByName("WinDrop").Length > 0) throw new InvalidOperationException("Quit WinDrop from its tray menu before installing or changing its adapter.");
+        if (Process.GetProcessesByName("WinDrop").Length > 0 || Process.GetProcessesByName("SwooshDrop").Length > 0) throw new InvalidOperationException("Quit SwooshDrop or the previous WinDrop app from its tray menu before installing or changing its adapter.");
         var profile = AdapterCatalog.Profile(instance, ResourceText("Setup.adapters.json")); if (profile == null) throw new InvalidOperationException("Unsupported USB adapter.");
         if (KernelVersion() != Kernel) throw new InvalidOperationException("The WSL kernel changed. Check prerequisites again.");
         var selected = Devices().SingleOrDefault(d => string.Equals(Convert.ToString(d["InstanceId"]), instance, StringComparison.OrdinalIgnoreCase));
@@ -172,7 +172,7 @@ public sealed class SetupEngine
             string rootfs = Path.Combine(cache, "ubuntu-noble.rootfs.tar.gz");
             Download("https://cloud-images.ubuntu.com/wsl/releases/24.04/20240423/ubuntu-noble-wsl-amd64-24.04lts.rootfs.tar.gz", rootfs, RootHash);
             string storage = Path.Combine(Home, "Data", "WSL"); Directory.CreateDirectory(storage);
-            Report("Creating WinDrop's dedicated runtime…"); Run("wsl.exe", "--import", Distro, storage, rootfs, "--version", "2");
+            Report("Creating SwooshDrop's dedicated runtime…"); Run("wsl.exe", "--import", Distro, storage, rootfs, "--version", "2");
             Run("wsl.exe", "-d", Distro, "-u", "root", "--exec", "touch", "/etc/windrop-owned-distro");
         }
         else
@@ -185,27 +185,28 @@ public sealed class SetupEngine
         Report("Installing Linux dependencies and checking the runtime. This can take several minutes…");
         Run("wsl.exe", "-d", Distro, "-u", "root", "--exec", "bash", linuxScript, linuxPayload);
         Report("Installing the Windows app, shortcuts, and notification support…");
-        string app = Path.Combine(Home, "WinDrop.exe"); Extract("Setup.WinDrop.exe", app);
+        string app = Path.Combine(Home, "SwooshDrop.exe"); Extract("Setup.SwooshDrop.exe", app);
         Directory.CreateDirectory(Path.Combine(Home, "Data", "Runtime")); Directory.CreateDirectory(Path.Combine(Home, "Data", "Previews")); Directory.CreateDirectory(Path.Combine(Home, "Data", "Logs"));
         string settingsPath = Path.Combine(Home, "Data", "settings.json");
-        var prefs = File.Exists(settingsPath) ? Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(settingsPath)) : new Dictionary<string, object> { { "SaveFolder", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WinDrop") }, { "ReceiveOnLaunch", true }, { "Notifications", true }, { "OpenLinksOnReceive", true } };
+        var prefs = File.Exists(settingsPath) ? Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(settingsPath)) : new Dictionary<string, object> { { "SaveFolder", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SwooshDrop") }, { "ReceiveOnLaunch", true }, { "Notifications", true }, { "OpenLinksOnReceive", true } };
         prefs["RuntimeDistro"] = Distro; prefs["AdapterInstanceId"] = instance; File.WriteAllText(settingsPath, Json.Serialize(prefs), new UTF8Encoding(false));
-        Extract("Setup.corresponding-source.tar.gz", Path.Combine(Home, "Sources", "corresponding-source-0.3.0.tar.gz"));
+        Extract("Setup.corresponding-source.tar.gz", Path.Combine(Home, "Sources", "corresponding-source-0.3.1.tar.gz"));
         Extract("Setup.NOTICES.txt", Path.Combine(Home, "Sources", "NOTICES.txt"));
-        string setup = Path.Combine(Home, "WinDropSetup.exe"); if (!string.Equals(setup, Assembly.GetExecutingAssembly().Location, StringComparison.OrdinalIgnoreCase)) File.Copy(Assembly.GetExecutingAssembly().Location, setup, true);
+        string setup = Path.Combine(Home, "SwooshDropSetup.exe"); if (!string.Equals(setup, Assembly.GetExecutingAssembly().Location, StringComparison.OrdinalIgnoreCase)) File.Copy(Assembly.GetExecutingAssembly().Location, setup, true);
         NativeIntegration.Register(app); NativeIntegration.SetAutostart(app, autostart);
         // Desktop shortcut copies the registered Start-menu shortcut, including notification metadata.
-        File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), true);
+        File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SwooshDrop.lnk"), true);
+        // Keep the old data/runtime, but retire old launch points only after the new app is installed.
+        foreach (string legacy in new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), Path.Combine(Home, "WinDrop.exe") }) if (File.Exists(legacy)) File.Delete(legacy);
         using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\WinDrop"))
-        { key.SetValue("DisplayName", "WinDrop PC"); key.SetValue("DisplayVersion", "0.3.0"); key.SetValue("Publisher", "WinDrop PC contributors"); key.SetValue("InstallLocation", Home); key.SetValue("DisplayIcon", app); key.SetValue("UninstallString", Quote(setup) + " --uninstall"); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1); }
-        Report("Installed. Open WinDrop, then use Share → AirDrop on your iPhone.");
+        { key.SetValue("DisplayName", "SwooshDrop"); key.SetValue("DisplayVersion", "0.3.1"); key.SetValue("Publisher", "SwooshDrop contributors"); key.SetValue("InstallLocation", Home); key.SetValue("DisplayIcon", app); key.SetValue("UninstallString", Quote(setup) + " --uninstall"); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1); }
+        Report("Installed. Open SwooshDrop, then use Share → AirDrop on your iPhone.");
     }
     public static void Uninstall()
     {
-        if (Process.GetProcessesByName("WinDrop").Length > 0) throw new InvalidOperationException("Quit WinDrop from its tray menu first.");
-        NativeIntegration.SetAutostart(Path.Combine(Home, "WinDrop.exe"), false);
-        string app = Path.Combine(Home, "WinDrop.exe");
-        foreach (string path in new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), app }) if (File.Exists(path)) File.Delete(path);
+        if (Process.GetProcessesByName("WinDrop").Length > 0 || Process.GetProcessesByName("SwooshDrop").Length > 0) throw new InvalidOperationException("Quit SwooshDrop from its tray menu first.");
+        NativeIntegration.SetAutostart(Path.Combine(Home, "SwooshDrop.exe"), false);
+        foreach (string path in new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), Path.Combine(Home, "SwooshDrop.exe"), Path.Combine(Home, "WinDrop.exe") }) if (File.Exists(path)) File.Delete(path);
         foreach (string key in new[] { @"Software\Classes\windrop", @"Software\Classes\AppUserModelId\WinDrop.PC", @"Software\Classes\CLSID\{74331E92-9FD9-4BEE-8563-83110C44FF39}", @"Software\Microsoft\Windows\CurrentVersion\Uninstall\WinDrop" }) Registry.CurrentUser.DeleteSubKeyTree(key, false);
         // Keep received files, history, and the dedicated WSL distribution for reinstall.
     }
@@ -231,19 +232,19 @@ public sealed class SetupWindow : Form
     readonly SetupEngine engine = new SetupEngine(); bool busy;
     public SetupWindow()
     {
-        Text = "WinDrop Setup"; ClientSize = new Size(760, 600); MinimumSize = MaximumSize = Size; StartPosition = FormStartPosition.CenterScreen;
+        Text = "SwooshDrop Setup"; ClientSize = new Size(760, 600); MinimumSize = MaximumSize = Size; StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(247, 249, 253); Font = new Font("Segoe UI", 10); FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
         title.Text = "AirDrop, meet your PC."; title.Font = new Font("Segoe UI", 24, FontStyle.Bold); title.SetBounds(32, 26, 700, 52);
-        subtitle.Text = "WinDrop PC · 0.3 beta\nReceive original photos, files, and links from your iPhone."; subtitle.SetBounds(34, 86, 690, 52);
-        hardware.Text = "Use a dedicated USB Wi-Fi adapter. WinDrop reserves it while receiving.\nWindows 10/11 x64 · Internet for setup · Compatible USB required."; hardware.SetBounds(34, 157, 690, 70);
+        subtitle.Text = "SwooshDrop · 0.3.1 beta\nReceive original photos, files, and links from your iPhone."; subtitle.SetBounds(34, 86, 690, 52);
+        hardware.Text = "Use a dedicated USB Wi-Fi adapter. SwooshDrop reserves it while receiving.\nWindows 10/11 x64 · Internet for setup · Compatible USB required."; hardware.SetBounds(34, 157, 690, 70);
         check.Text = "1  Check prerequisites"; check.SetBounds(34, 228, 245, 42);
         adapters.SetBounds(34, 290, 690, 32); adapters.DropDownStyle = ComboBoxStyle.DropDownList;
-        startup.Text = "Start WinDrop when I sign in"; startup.SetBounds(34, 339, 320, 30); startup.Checked = NativeIntegration.IsAutostartEnabled();
+        startup.Text = "Start SwooshDrop when I sign in"; startup.SetBounds(34, 339, 320, 30); startup.Checked = NativeIntegration.IsAutostartEnabled();
         log.SetBounds(34, 383, 690, 116); log.Multiline = true; log.ReadOnly = true; log.ScrollBars = ScrollBars.Vertical; log.BorderStyle = BorderStyle.FixedSingle; log.BackColor = Color.White;
         log.Text = "Setup creates a separate Linux runtime and keeps your Windows internet connection available. Only the selected USB adapter is shared.\r\nYour photos and files remain in their received folder when updating or removing the app.";
         progress.SetBounds(34, 512, 690, 7); progress.Style = ProgressBarStyle.Marquee; progress.Visible = false;
-        install.Text = "2  Install WinDrop"; install.SetBounds(34, 537, 245, 42); install.Enabled = false; install.BackColor = Color.FromArgb(51, 122, 245); install.ForeColor = Color.White; install.FlatStyle = FlatStyle.Flat;
-        open.Text = "Open WinDrop"; open.SetBounds(499, 537, 225, 42); open.Enabled = false;
+        install.Text = "2  Install SwooshDrop"; install.SetBounds(34, 537, 245, 42); install.Enabled = false; install.BackColor = Color.FromArgb(51, 122, 245); install.ForeColor = Color.White; install.FlatStyle = FlatStyle.Flat;
+        open.Text = "Open SwooshDrop"; open.SetBounds(499, 537, 225, 42); open.Enabled = false;
         Controls.AddRange(new Control[] { title, subtitle, hardware, check, adapters, startup, log, progress, install, open });
         engine.Report = Report;
         check.Click += async delegate { await Work(delegate { engine.Prerequisites(); }); if (!busy) RefreshAdapters(); };
@@ -254,14 +255,14 @@ public sealed class SetupWindow : Form
             if (a.Profile.Status != "tested" && MessageBox.Show(this, "This adapter has a bundled driver but has not passed an AirDrop test. Discovery or transfers may fail. Continue with this experimental adapter?", "Experimental adapter", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
             bool start = startup.Checked; bool success = await Work(delegate { engine.Install(a.Instance, start); }); open.Enabled = success;
         };
-        open.Click += delegate { Process.Start(Path.Combine(SetupEngine.Home, "WinDrop.exe")); Close(); };
+        open.Click += delegate { Process.Start(Path.Combine(SetupEngine.Home, "SwooshDrop.exe")); Close(); };
         FormClosing += delegate(object sender, FormClosingEventArgs e) { if (busy) { e.Cancel = true; Report("Wait for the current setup step to finish before closing."); } };
     }
     void Report(string message) { if (InvokeRequired) { BeginInvoke(new Action<string>(Report), message); return; } log.AppendText("\r\n" + message); }
     async Task<bool> Work(Action action)
     {
         busy = true; check.Enabled = install.Enabled = open.Enabled = adapters.Enabled = startup.Enabled = false; progress.Visible = true;
-        try { await Task.Run(action); return true; } catch (Exception ex) { Report(ex.Message); MessageBox.Show(this, ex.Message, "WinDrop Setup", MessageBoxButtons.OK, MessageBoxIcon.Information); return false; }
+        try { await Task.Run(action); return true; } catch (Exception ex) { Report(ex.Message); MessageBox.Show(this, ex.Message, "SwooshDrop Setup", MessageBoxButtons.OK, MessageBoxIcon.Information); return false; }
         finally { busy = false; progress.Visible = false; check.Enabled = adapters.Enabled = startup.Enabled = true; }
     }
     public void RefreshAdapters()
@@ -285,12 +286,12 @@ public sealed class SetupWindow : Form
     [STAThread] public static void Main(string[] args)
     {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-        if (args.Length > 0 && new[] { "--install-usb", "--install-wsl", "--enable-wsl", "--bind" }.Contains(args[0])) { try { Environment.Exit(SetupEngine.Admin(args)); } catch (Exception ex) { MessageBox.Show(ex.Message, "WinDrop Setup"); Environment.Exit(1); } return; }
+        if (args.Length > 0 && new[] { "--install-usb", "--install-wsl", "--enable-wsl", "--bind" }.Contains(args[0])) { try { Environment.Exit(SetupEngine.Admin(args)); } catch (Exception ex) { MessageBox.Show(ex.Message, "SwooshDrop Setup"); Environment.Exit(1); } return; }
         if (args.Length == 2 && args[0] == "--check-json") { File.WriteAllText(args[1], SetupEngine.Json.Serialize(SetupEngine.Check())); return; }
         if (args.Length > 0 && args[0] == "--uninstall")
         {
-            if (MessageBox.Show("Remove the WinDrop app and shortcuts? Your received files, history, source archive, and Linux runtime will be kept.", "Remove WinDrop", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
-            try { SetupEngine.Uninstall(); MessageBox.Show("WinDrop removed. Received files and the runtime were kept.", "WinDrop"); } catch (Exception ex) { MessageBox.Show(ex.Message, "WinDrop"); } return;
+            if (MessageBox.Show("Remove the SwooshDrop app and shortcuts? Your received files, history, source archive, and Linux runtime will be kept.", "Remove SwooshDrop", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
+            try { SetupEngine.Uninstall(); MessageBox.Show("SwooshDrop removed. Received files and the runtime were kept.", "SwooshDrop"); } catch (Exception ex) { MessageBox.Show(ex.Message, "SwooshDrop"); } return;
         }
         var window = new SetupWindow();
         if (args.Length == 2 && args[0] == "--render") { window.Show(); Application.DoEvents(); window.RefreshAdapters(); Application.DoEvents(); using (var bitmap = new Bitmap(window.Width, window.Height)) { window.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(args[1]); } window.Dispose(); return; }
