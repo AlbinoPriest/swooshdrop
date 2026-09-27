@@ -1,15 +1,16 @@
 diff --git a/src/WinDrop.Cli/Program.cs b/src/WinDrop.Cli/Program.cs
-index b749151..3adb4bb 100644
+index b749151..05f7461 100644
 --- a/src/WinDrop.Cli/Program.cs
 +++ b/src/WinDrop.Cli/Program.cs
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,7 @@
  using System.Globalization;
 +using System.Text.Json;
 +using System.Threading.Channels;
++using System.Diagnostics;
  using System.Net;
  using System.Security.Cryptography.X509Certificates;
  using WinDrop.Protocol;
-@@ -45,7 +47,7 @@ static int PrintUsage()
+@@ -45,7 +48,7 @@ static int PrintUsage()
      Console.WriteLine("""
          WinDrop - an AirDrop implementation for Windows
  
@@ -18,7 +19,7 @@ index b749151..3adb4bb 100644
            windrop send [--to <name>| --peer <host>] [--icon <image>] <file> [file...]
            windrop browse                   list nearby peers
  
-@@ -64,10 +66,13 @@ static int PrintUsage()
+@@ -64,16 +67,19 @@ static int PrintUsage()
  
  static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
  {
@@ -32,7 +33,14 @@ index b749151..3adb4bb 100644
  
      Directory.CreateDirectory(directory);
  
-@@ -101,14 +106,15 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+     // --flags overrides what the TXT record advertises, so a session can test what iOS does
+     // in response: whether it still attaches a preview, and whether it picks DVZip or gzip.
+-    var flags = AirDropReceiverFlags.SupportsDvZip | AirDropReceiverFlags.SupportsMixedTypes;
++    var flags = AirDropReceiverFlags.SupportsDvZip | AirDropReceiverFlags.SupportsMixedTypes | AirDropReceiverFlags.SupportsUrl;
+ 
+     if (ArgumentValue(args, "--flags") is { } flagText)
+     {
+@@ -101,14 +107,15 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
  
      var receiver = new AirDropReceiver(new AirDropReceiverOptions
      {
@@ -41,7 +49,7 @@ index b749151..3adb4bb 100644
          DownloadDirectory = directory,
          Flags = flags,
 -        ConsentHandler = autoAccept ? AutoAcceptAsync : PromptAsync,
-+        ConsentHandler = uiEvents ? UiConsentAsync : autoAccept ? AutoAcceptAsync : PromptAsync,
++        ConsentHandler = uiEvents ? (request, token) => UiConsentAsync(request, ArgumentValue(args, "--preview-decoder"), token) : autoAccept ? AutoAcceptAsync : PromptAsync,
          EarlyAskReply = earlyAsk,
 -        // Timestamped so a transfer's duration can be read straight off the log: from
 -        // "request POST /Upload" to "upload complete".
@@ -49,11 +57,11 @@ index b749151..3adb4bb 100644
 +        // This timing excludes bytes buffered while waiting for consent.
 +        Log = line => { if (uiEvents) EmitUi(new { kind = "log", message = line });
 +                        else Console.WriteLine($"  {DateTime.Now:HH:mm:ss} {line}"); },
-+        TransferCompleted = uiEvents ? result => EmitUi(new { kind = "completed", files = result.Files, bytes = result.TotalBytes }) : null,
++        TransferCompleted = uiEvents ? result => EmitUi(new { kind = "completed", files = result.Files, bytes = result.TotalBytes, links = result.Links }) : null,
      });
  
      await using IAirDropTransport transport = CreateTransport(args);
-@@ -117,19 +123,21 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+@@ -117,19 +124,21 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
      // 8770. The SRV record carries the port, so browsers find it wherever it listens.
      int port = int.TryParse(ArgumentValue(args, "--port"), out int requested) ? requested : AirDropServiceRecord.DefaultPort;
  
@@ -78,7 +86,7 @@ index b749151..3adb4bb 100644
  
      await foreach (Stream raw in transport.AcceptAsync(record.Port, ct))
      {
-@@ -140,7 +148,7 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+@@ -140,7 +149,7 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
              await using var ssl = await AirDropTls.AuthenticateAsServerAsync(raw, certificate, ct);
              AirDropTransferResult? result = await receiver.HandleConnectionAsync(ssl, ct);
  
@@ -87,7 +95,7 @@ index b749151..3adb4bb 100644
              {
                  Console.WriteLine($"Received {result.Files.Count} file(s), {result.TotalBytes:N0} bytes:");
                  foreach (string file in result.Files) Console.WriteLine($"  {file}");
-@@ -149,7 +157,8 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+@@ -149,7 +158,8 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
          }
          catch (Exception ex) when (ex is not OperationCanceledException)
          {
@@ -97,7 +105,7 @@ index b749151..3adb4bb 100644
          }
          finally
          {
-@@ -177,6 +186,36 @@ static Task<bool> AutoAcceptAsync(AirDropAskRequest request, CancellationToken c
+@@ -177,8 +187,67 @@ static Task<bool> AutoAcceptAsync(AirDropAskRequest request, CancellationToken c
      return Task.FromResult(true);
  }
  
@@ -106,11 +114,13 @@ index b749151..3adb4bb 100644
 +    Console.WriteLine(JsonSerializer.Serialize(value));
 +}
 +
-+static async Task<bool> UiConsentAsync(AirDropAskRequest request, CancellationToken ct)
++static async Task<bool> UiConsentAsync(AirDropAskRequest request, string? decoder, CancellationToken ct)
 +{
 +    string id = Guid.NewGuid().ToString("N");
++    string? preview = await DecodePreviewAsync(request.FileIcon, decoder, ct);
 +    EmitUi(new { kind = "consent", id, sender = request.SenderComputerName,
-+        files = request.Files.Select(f => f.FileName).ToArray(), converted = request.ConvertMediaFormats });
++        files = request.Files.Select(f => f.FileName).ToArray(), links = request.Items,
++        preview, converted = request.ConvertMediaFormats });
 +    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
 +    deadline.CancelAfter(TimeSpan.FromSeconds(60));
 +    try
@@ -131,10 +141,39 @@ index b749151..3adb4bb 100644
 +    return false;
 +}
 +
++static async Task<string?> DecodePreviewAsync(byte[]? icon, string? decoder, CancellationToken ct)
++{
++    if (icon is not { Length: > 0 } || icon.Length > 1024 * 1024 || decoder is null || PreviewImage.Sniff(icon) == PreviewImageFormat.Unknown) return null;
++    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
++    deadline.CancelAfter(TimeSpan.FromSeconds(4));
++    using var process = new Process { StartInfo = new ProcessStartInfo("python3")
++        { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false } };
++    process.StartInfo.ArgumentList.Add(decoder);
++    try
++    {
++        process.Start();
++        var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
++        var errors = process.StandardError.ReadToEndAsync(deadline.Token);
++        await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { image = Convert.ToBase64String(icon) }).AsMemory(), deadline.Token);
++        process.StandardInput.Close();
++        await process.WaitForExitAsync(deadline.Token);
++        string encoded = (await output).Trim();
++        await errors;
++        if (process.ExitCode == 0 && encoded.Length is > 0 and < 600000) return encoded;
++    }
++    catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested) { }
++    finally { try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { } }
++    return null;
++}
++
  static void DescribePreview(AirDropAskRequest request)
  {
++    if (request.Items is not null)
++        foreach (string link in request.Items) Console.WriteLine($"  link: {link}");
      // Only the size and the signature. Decoding it would mean pointing an image codec at
-@@ -441,3 +480,28 @@ static string? ArgumentValue(string[] args, string name)
+     // a stranger's bytes from a console tool that has nothing to show them on.
+     if (request.FileIcon is { } icon)
+@@ -441,3 +510,28 @@ static string? ArgumentValue(string[] args, string name)
      int index = Array.FindIndex(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
      return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
  }
@@ -163,8 +202,61 @@ index b749151..3adb4bb 100644
 +        return null;
 +    }
 +}
+diff --git a/src/WinDrop.Protocol/AirDropMessages.cs b/src/WinDrop.Protocol/AirDropMessages.cs
+index 324d8fa..0574cbc 100644
+--- a/src/WinDrop.Protocol/AirDropMessages.cs
++++ b/src/WinDrop.Protocol/AirDropMessages.cs
+@@ -1,3 +1,5 @@
++using WinDrop.Protocol.Http;
++
+ namespace WinDrop.Protocol;
+ 
+ /// <summary>
+@@ -57,7 +59,8 @@ public sealed record AirDropAskRequest(
+     string BundleId,
+     IReadOnlyList<AirDropFileEntry> Files,
+     bool ConvertMediaFormats = false,
+-    byte[]? FileIcon = null)
++    byte[]? FileIcon = null,
++    IReadOnlyList<string>? Items = null)
+ {
+     public const string FinderBundleId = "com.apple.finder";
+ 
+@@ -79,6 +82,7 @@ public sealed record AirDropAskRequest(
+         // nobody.
+         if (FileIcon is { Length: > 0 })
+             plist["FileIcon"] = FileIcon;
++        if (Items is { Count: > 0 }) plist["Items"] = Items.Cast<object?>().ToList();
+ 
+         return plist;
+     }
+@@ -105,7 +109,23 @@ public sealed record AirDropAskRequest(
+             ConvertMediaFormats: plist.GetValueOrDefault("ConvertMediaFormats") is true,
+             // Anything other than a data object is dropped, not coerced: a string here is
+             // not an image in some other spelling, it is a peer sending nonsense.
+-            FileIcon: plist.GetValueOrDefault("FileIcon") as byte[]);
++            FileIcon: plist.GetValueOrDefault("FileIcon") as byte[],
++            Items: ReadLinks(plist));
++    }
++
++    private static IReadOnlyList<string> ReadLinks(IReadOnlyDictionary<string, object?> plist)
++    {
++        var links = new List<string>();
++        if (plist.GetValueOrDefault("Items") is IEnumerable<object?> items)
++            foreach (object? item in items)
++            {
++                if (item is not string link || link.Length > 8192 || links.Count >= 16
++                    || !Uri.TryCreate(link, UriKind.Absolute, out Uri? uri)
++                    || uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo))
++                    throw new AirDropHttpException("Unsupported link in AirDrop request.");
++                links.Add(link);
++            }
++        return links;
+     }
+ }
+ 
 diff --git a/src/WinDrop.Protocol/AirDropReceiver.cs b/src/WinDrop.Protocol/AirDropReceiver.cs
-index 2d642ae..cfb6e66 100644
+index 2d642ae..e4f33fb 100644
 --- a/src/WinDrop.Protocol/AirDropReceiver.cs
 +++ b/src/WinDrop.Protocol/AirDropReceiver.cs
 @@ -31,6 +31,9 @@ public sealed class AirDropReceiverOptions
@@ -177,7 +269,41 @@ index 2d642ae..cfb6e66 100644
      public const long DefaultMaxExtractedBytes = 8L * 1024 * 1024 * 1024;
  
      /// <summary>The most an /Upload body may be as sent, before decompression.</summary>
-@@ -200,6 +203,7 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+@@ -63,7 +66,7 @@ public sealed class AirDropReceiverOptions
+     public bool EarlyAskReply { get; init; } = true;
+ }
+ 
+-public sealed record AirDropTransferResult(IReadOnlyList<string> Files, long TotalBytes);
++public sealed record AirDropTransferResult(IReadOnlyList<string> Files, long TotalBytes, IReadOnlyList<string>? Links = null);
+ 
+ /// <summary>
+ /// The receiving half of AirDrop: /Discover, /Ask and /Upload over one TLS connection.
+@@ -136,6 +139,8 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+                         throw new AirDropHttpException("/Ask body was not a plist dictionary.");
+ 
+                     AirDropAskRequest request = AirDropAskRequest.FromPlist(plist);
++                    if (request.Items is { Count: > 0 } && request.Files.Count > 0)
++                        throw new AirDropHttpException("Mixed links and file archives are unsupported.");
+ 
+                     long consentStart = askTimer.ElapsedMilliseconds;
+ 
+@@ -146,8 +151,15 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+ 
+                         long consentMs = askTimer.ElapsedMilliseconds - consentStart;
+ 
++                        if (request.Items is { Count: > 0 })
++                            result = await SaveLinksAsync(request.Items, ct);
+                         await RespondPlistAsync(connection, 200, "OK",
+                             new AirDropReceiverIdentity(options.ComputerName, options.ModelName).ToPlist(), ct);
++                        if (request.Items is { Count: > 0 })
++                        {
++                            state = State.Completed;
++                            options.TransferCompleted?.Invoke(result!);
++                        }
+ 
+                         long replyMs = askTimer.ElapsedMilliseconds - consentStart - consentMs;
+ 
+@@ -200,6 +212,7 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
                      options.Log?.Invoke($"upload complete: {result.Files.Count} file(s), {result.TotalBytes:N0} bytes -> 200");
  
                      await connection.WriteResponseAsync(200, "OK", new HttpHeaders(), ReadOnlyMemory<byte>.Empty, ct);
@@ -185,6 +311,48 @@ index 2d642ae..cfb6e66 100644
                      break;
                  }
  
+@@ -267,6 +280,18 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+             if (BinaryPlistReader.Parse(body) is IReadOnlyDictionary<string, object?> plist)
+             {
+                 AirDropAskRequest request = AirDropAskRequest.FromPlist(plist);
++                if (request.Items is { Count: > 0 })
++                {
++                    if (request.Files.Count > 0) throw new AirDropHttpException("Mixed links and file archives are unsupported.");
++                    if (await StartConsentAsync(request, ct))
++                    {
++                        var links = await SaveLinksAsync(request.Items, ct);
++                        options.TransferCompleted?.Invoke(links);
++                        options.Log?.Invoke($"saved {request.Items.Count} link(s)");
++                    }
++                    else options.Log?.Invoke("link request declined; nothing saved");
++                    return (State.Completed, request, null);
++                }
+ 
+                 // Started, not awaited: the prompt runs while the upload streams in.
+                 Task<bool> consent = StartConsentAsync(request, ct);
+@@ -306,6 +331,22 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+         }
+     }
+ 
++    private async Task<AirDropTransferResult> SaveLinksAsync(IReadOnlyList<string> links, CancellationToken ct)
++    {
++        Directory.CreateDirectory(options.DownloadDirectory);
++        string path = Path.Combine(options.DownloadDirectory, $"Link-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.txt");
++        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(string.Join(Environment.NewLine, links));
++        bool created = false;
++        try
++        {
++            await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true);
++            created = true;
++            await file.WriteAsync(bytes, ct);
++        }
++        catch { if (created && File.Exists(path)) File.Delete(path); throw; }
++        return new AirDropTransferResult([path], bytes.Length, links);
++    }
++
+     /// <summary>
+     /// Reads one upload. Returns null when it was declined after /Ask had been answered,
+     /// which only happens in early-ask mode, where the answer preceded the decision.
 diff --git a/src/WinDrop.Protocol/Discovery/AirDropRecords.cs b/src/WinDrop.Protocol/Discovery/AirDropRecords.cs
 index b0ac419..12f6fff 100644
 --- a/src/WinDrop.Protocol/Discovery/AirDropRecords.cs
@@ -314,7 +482,7 @@ index 68e7ebb..9a7d670 100644
      }
  
 diff --git a/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs b/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
-index 38535a0..b476052 100644
+index 38535a0..846ab09 100644
 --- a/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
 +++ b/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
 @@ -48,7 +48,8 @@ public class AirDropFlowTests : IDisposable
@@ -361,6 +529,54 @@ index 38535a0..b476052 100644
          }
          finally
          {
+@@ -149,6 +156,47 @@ public class AirDropFlowTests : IDisposable
+         Assert.Equal("hello from the sender", await File.ReadAllTextAsync(Path.Combine(_downloadDir, "notes.txt")));
+     }
+ 
++    [Theory]
++    [InlineData(false, true)]
++    [InlineData(false, false)]
++    [InlineData(true, true)]
++    [InlineData(true, false)]
++    public async Task Web_link_is_saved_only_after_consent_without_an_upload(bool early, bool allow)
++    {
++        AirDropTransferResult? committed = null;
++        Harness h = await StartAsync((_, _) => Task.FromResult(allow), earlyAsk: early,
++            completed: result => committed = result);
++        try
++        {
++            await h.Session.AskAsync(new AirDropAskRequest("Phone", "iPhone", "id",
++                AirDropAskRequest.FinderBundleId, [], Items: ["https://example.com/a?x=1&y=2"]));
++        }
++        finally { await h.Shutdown(); }
++        await h.ServerTask.WaitAsync(TimeSpan.FromSeconds(10));
++        if (allow)
++        {
++            Assert.NotNull(committed);
++            Assert.Equal(["https://example.com/a?x=1&y=2"], committed.Links);
++            Assert.Equal("https://example.com/a?x=1&y=2", await File.ReadAllTextAsync(Assert.Single(committed.Files)));
++        }
++        else
++        {
++            Assert.Null(committed);
++            Assert.False(Directory.Exists(_downloadDir) && Directory.GetFiles(_downloadDir).Length > 0);
++        }
++    }
++
++    [Theory]
++    [InlineData("file:///C:/Windows/System32/cmd.exe")]
++    [InlineData("javascript:alert(1)")]
++    [InlineData("windrop://accept?id=fake")]
++    [InlineData("https://user:password@example.com")]
++    public void Unsafe_link_schemes_are_not_accepted(string link)
++    {
++        var ask = new AirDropAskRequest("Phone", "iPhone", "id", AirDropAskRequest.FinderBundleId, [], Items: [link]);
++        Assert.Throws<AirDropHttpException>(() => AirDropAskRequest.FromPlist(ask.ToPlist()));
++    }
++
+     [Fact]
+     public async Task Declining_consent_blocks_the_upload()
+     {
 diff --git a/tests/WinDrop.Protocol.Tests/DiscoveryRefreshTests.cs b/tests/WinDrop.Protocol.Tests/DiscoveryRefreshTests.cs
 new file mode 100644
 index 0000000..18fee14

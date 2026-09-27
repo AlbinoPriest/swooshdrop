@@ -23,7 +23,8 @@ apt-get install -y --no-install-recommends \
   cmake git ca-certificates libpcap-dev libev-dev \
   libnl-3-dev libnl-genl-3-dev libnl-route-3-dev \
   iw usbutils kmod python3 iproute2 dotnet-sdk-8.0 \
-  linux-firmware wireless-regdb zstd tcpdump libarchive-tools
+  linux-firmware wireless-regdb zstd tcpdump libarchive-tools \
+  python3-pil libheif-examples libheif-plugin-libde265
 ```
 
 From the mounted repository directory, run:
@@ -32,7 +33,7 @@ From the mounted repository directory, run:
 bash scripts/prepare-protocol.sh
 ```
 
-This builds the pinned OWL source and applies the WinDrop patch before building `/opt/airdrop-lab/receiver-refresh`. Run it only while receiving is stopped: rebuilding live dependency files is not supported. Existing source at another revision is rejected rather than overwritten.
+This builds the pinned OWL source and applies the WinDrop patch before building `/opt/airdrop-lab/receiver-product`, with a copy in `receiver-refresh` for older helpers. Run it only while receiving is stopped: rebuilding live dependency files is not supported. Existing source at another revision is rejected rather than overwritten. Pillow normalizes incoming previews; `heif-convert` generates gallery thumbnails from HEIC files without changing the saved originals.
 
 ## Matching radio driver
 
@@ -80,7 +81,7 @@ WINDROP_PYTHON=/usr/bin/python3 dotnet test \
 
 Some upstream archive oracle tests look for a tool named `tar.exe`. To exercise those on Linux, supply a test-only `tar.exe` symlink to `bsdtar` in a directory added to the test process's PATH. The normal `tar` command does not satisfy that check. The prototype test results included the Python and libarchive oracles.
 
-Build the Windows executable using `Build-WinDropTray.ps1` and Windows PowerShell 5.1. It is an unsigned local build and saves files beside the executable. Start only one receiver across all copies of the project; the Linux helper also uses an exclusive session lock.
+Build with `Build-WinDrop.ps1`, then run `Install-WinDrop.ps1 -Launch` in Windows PowerShell 5.1. Windows .NET Framework 4.8 supplies WPF and the compiler; a Windows .NET SDK is unnecessary. The installer creates desktop/Start menu shortcuts and the `windrop:` URI handler used by notification buttons. Association caches are refreshed after registration. Files default to Downloads\WinDrop. Optional sign-in startup is controlled in Settings and uses the current user's Run registry key. Start only one receiver; the Linux helper also uses an exclusive session lock.
 
 Relay/control listeners bind to IPv6 loopback. AirDrop listens on the AWDL interface. Transfer consent is essential: the display name is supplied by the sender and is not verified Apple identity. The app requires an explicit decision for each transfer and rejects unanswered requests.
 

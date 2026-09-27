@@ -15,6 +15,15 @@ case "${1:-}" in
         exit 1
         ;;
     stop)
+        if [[ -n "${2:-}" ]] && [[ ! -f /run/airdrop-lab/session.owner || "$(cat /run/airdrop-lab/session.owner)" != "$2" ]]; then
+            # Startup may fail before recording an owner. A free session lock
+            # proves no receiver is running, so the caller may detach its USB.
+            if [[ ! -f /run/airdrop-lab/session.owner ]] && flock -n /run/airdrop-lab/session.lock -c true; then
+                exit 0
+            fi
+            echo 'This receiver session belongs to a different instance.' >&2
+            exit 75
+        fi
         if [[ -f /run/airdrop-lab/session.pid ]]; then
             labpid=$(cat /run/airdrop-lab/session.pid)
             [[ "$labpid" =~ ^[0-9]+$ ]] || exit 1

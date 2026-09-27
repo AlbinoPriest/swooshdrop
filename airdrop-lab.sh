@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Local compatibility prototype: WinDrop (MIT) + OWL (GPL-3.0) + rtl8xxxu.
+# Local hardware beta: WinDrop (MIT) + OWL (GPL-3.0) + rtl8188eus.
 set -euo pipefail
 lab=/opt/airdrop-lab
 out=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-mkdir -p "$out/logs" "$out/received" /run/airdrop-lab
+destination=${3:-$out/received}
+mkdir -p "$out/logs" "$destination" /run/airdrop-lab
 exec 9>/run/airdrop-lab/session.lock
 flock -n 9 || { echo 'An AirDrop lab session is already running.' >&2; exit 75; }
 
@@ -33,10 +34,12 @@ cleanup() {
         iw dev "$radio" set type managed 2>/dev/null || true
     fi
     rm -f /run/airdrop-lab/session.pid
+    rm -f /run/airdrop-lab/session.owner
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 echo $$ > /run/airdrop-lab/session.pid
+printf '%s\n' "${4:-console}" > /run/airdrop-lab/session.owner
 
 # WSL firmware loads use the shared init namespace, not the Ubuntu root filesystem.
 # Supply uncompressed firmware in a shared mount, then restore the search path after probe.
@@ -96,7 +99,9 @@ if ! ip link set "$radio" up; then
 fi
 iw dev "$radio" set channel 6 HT20
 iw dev "$radio" info | tee "$out/logs/radio-info.txt"
-stdbuf -oL -eL "$lab/owl/build/daemon/owl" -i "$radio" -c 6 -v -f -N > "$out/logs/owl.log" 2>&1 &
+owl_flags=(-f -N)
+[[ "${2:-}" == --ui-events ]] || owl_flags+=(-v)
+stdbuf -oL -eL "$lab/owl/build/daemon/owl" -i "$radio" -c 6 "${owl_flags[@]}" > "$out/logs/owl.log" 2>&1 &
 owl_pid=$!
 for pass in {1..50}; do
     kill -0 "$owl_pid" 2>/dev/null || { tail -n 30 "$out/logs/owl.log"; exit 1; }
@@ -116,7 +121,7 @@ for pass in {1..50}; do
     sleep 0.2
 done
 if [[ "${2:-}" == --ui-events ]]; then
-    dotnet "$lab/receiver-refresh/windrop.dll" receive --bridge ::1 --name 'WinDrop PC' --dir "$out/received" --ui-events 2>&1 | tee "$out/logs/receiver.log"
+    dotnet "$out/windrop.dll" receive --bridge ::1 --name 'WinDrop PC' --dir "$destination" --ui-events --preview-decoder "$out/render-preview.py" 2>&1 | tee "$out/logs/receiver.log"
 else
     echo 'Starting receiver. Transfers require approval. This test session stops after 15 minutes.'
     timeout --foreground 15m dotnet "$lab/windrop/src/WinDrop.Cli/bin/Release/net8.0/windrop.dll" receive --bridge ::1 --name 'WinDrop PC' --dir "$out/received" 2>&1 | tee "$out/logs/receiver.log"

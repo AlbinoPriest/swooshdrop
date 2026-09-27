@@ -26,6 +26,8 @@ if ! git -C "$lab/windrop" apply --reverse --check "$repo/patches/prototype-chan
     git -C "$lab/windrop" apply --check "$repo/patches/prototype-changes.patch"
     git -C "$lab/windrop" apply "$repo/patches/prototype-changes.patch"
 fi
-dotnet build "$lab/windrop/src/WinDrop.Cli/WinDrop.Cli.csproj" -c Release -o "$lab/receiver-refresh"
+dotnet build "$lab/windrop/src/WinDrop.Cli/WinDrop.Cli.csproj" -c Release -o "$lab/receiver-product"
+mkdir -p "$lab/receiver-refresh"
+cp "$lab/receiver-product/"* "$lab/receiver-refresh/"
 
 echo 'Protocol build complete. The radio driver and USB passthrough must also be provisioned.'
