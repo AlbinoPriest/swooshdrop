@@ -1,0 +1,80 @@
+diff --git a/Makefile b/Makefile
+index 2aa7eef..7f3e9bf 100755
+--- a/Makefile
++++ b/Makefile
+@@ -1980,6 +1980,9 @@ ifneq ($(USER_MODULE_NAME),)
+ MODULE_NAME := $(USER_MODULE_NAME)
+ endif
+ 
++# Kernel 6.18 uses ccflags-y for module compile options.
++ccflags-y += $(EXTRA_CFLAGS)
++
+ ifneq ($(KERNELRELEASE),)
+ 
+ ########### this part for *.mk ############################
+diff --git a/include/osdep_service_linux.h b/include/osdep_service_linux.h
+index 769d6e4..ae6f161 100644
+--- a/include/osdep_service_linux.h
++++ b/include/osdep_service_linux.h
+@@ -16,6 +16,14 @@
+ #define __OSDEP_LINUX_SERVICE_H_
+ 
+ #include <linux/version.h>
++
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
++#include <linux/timer.h>
++#define from_timer timer_container_of
++#define del_timer_sync timer_delete_sync
++#define del_timer timer_delete
++#endif
++
+ #include <linux/spinlock.h>
+ #include <linux/compiler.h>
+ #include <linux/kernel.h>
+diff --git a/os_dep/linux/ioctl_cfg80211.c b/os_dep/linux/ioctl_cfg80211.c
+index 69abf47..94e91cd 100644
+--- a/os_dep/linux/ioctl_cfg80211.c
++++ b/os_dep/linux/ioctl_cfg80211.c
+@@ -3113,7 +3113,11 @@ exit:
+ 
+ }
+ 
+-static int cfg80211_rtw_set_wiphy_params(struct wiphy *wiphy, u32 changed)
++static int cfg80211_rtw_set_wiphy_params(struct wiphy *wiphy,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
++	int radio_idx,
++#endif
++	u32 changed)
+ {
+ #if 0
+ 	struct iwm_priv *iwm = wiphy_to_iwm(wiphy);
+@@ -3958,6 +3962,9 @@ static int cfg80211_rtw_set_txpower(struct wiphy *wiphy,
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+ 	struct wireless_dev *wdev,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
++	int radio_idx,
++#endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)) || defined(COMPAT_KERNEL_RELEASE)
+ 	enum nl80211_tx_power_setting type, int mbm)
+ #else
+@@ -4017,6 +4024,9 @@ if(type == NL80211_TX_POWER_FIXED) {
+ static int cfg80211_rtw_get_txpower(struct wiphy *wiphy,
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+ 	struct wireless_dev *wdev,
++#endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
++	int radio_idx, unsigned int link_id,
+ #endif
+ 	int *dbm)
+ {
+@@ -5659,6 +5669,9 @@ static int	cfg80211_rtw_set_channel(struct wiphy *wiphy
+ }
+ 
+ static int cfg80211_rtw_set_monitor_channel(struct wiphy *wiphy
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
++	, struct net_device *dev
++#endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+ 	, struct cfg80211_chan_def *chandef
+ #else

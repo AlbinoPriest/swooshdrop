@@ -1,0 +1,7 @@
+{
+  "windrop": { "url": "https://github.com/UvejsGj/WinDrop.git", "commit": "5a5dc52ce6eda298789622cb92d548d64d5673cc" },
+  "owl": { "url": "https://github.com/seemoo-lab/owl.git", "commit": "da255a70f221784c836d943dd3f243bc798f223b" },
+  "rtl8188eus": { "url": "https://github.com/aircrack-ng/rtl8188eus.git", "commit": "af3bf004458f76b7aec33e9ba552cd382ed1f5c3" },
+  "kernel": { "url": "https://github.com/microsoft/WSL2-Linux-Kernel.git", "tag": "linux-msft-wsl-6.18.33.2", "commit": "c21a03b2943d147c280bdf32530d4fe6badfd6bd" },
+  "tested": { "wsl_kernel": "6.18.33.2-microsoft-standard-WSL2", "usbipd_win": "5.3.0", "distro": "Ubuntu 24.04", "iphone": "iPhone 16 Pro Max", "ios": "27.0" }
+}

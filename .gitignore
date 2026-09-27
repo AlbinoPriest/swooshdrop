@@ -1,0 +1,38 @@
+# Local runtime, received media, and diagnostics
+received/
+logs/
+verification/
+work/
+adapter-setup.log
+*.log
+*.pcap
+*.pcapng
+*.heic
+*.jpg
+*.jpeg
+*.png
+*.mov
+*.mp4
+
+# Build outputs and installed dependencies
+*.exe
+*.dll
+*.pdb
+*.ko
+*.o
+bin/
+obj/
+dist/
+vendor/
+.vs/
+
+# Local settings, credentials, and certificates
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+settings.local.json
+*.user
