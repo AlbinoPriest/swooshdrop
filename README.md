@@ -4,7 +4,7 @@ Receive photos, files, and web links from your iPhone's native **Share → AirDr
 
 **Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl).
 
-**0.3.5 is an installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.5)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
+**0.3.6 is an installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.6)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
 
 ## Requirements and compatibility
 
@@ -29,7 +29,7 @@ Closing the window leaves SwooshDrop receiving in the tray. Left-click the tray 
 
 ## Updates and removal
 
-Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. The existing `%LOCALAPPDATA%\Programs\WinDrop` data folder and `WinDropRuntime` WSL distribution retain their internal names so upgrades do not move or erase existing data. Version 0.3.2 added USB enumeration recovery; 0.3.3 increased discovery announcements; 0.3.4 handles overlapping connections so a lingering discovery session does not block a transfer request, and preserves the bridge's response path when a sender finishes writing. Version 0.3.5 refreshes the interface, adds the tray status panel and in-app approval option, and puts live logs in Settings. Remove **SwooshDrop** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
+Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. The existing `%LOCALAPPDATA%\Programs\WinDrop` data folder and `WinDropRuntime` WSL distribution retain their internal names so upgrades do not move or erase existing data. Version 0.3.2 added USB enumeration recovery; 0.3.3 increased discovery announcements; 0.3.4 handles overlapping connections so a lingering discovery session does not block a transfer request, and preserves the bridge's response path when a sender finishes writing. Version 0.3.5 added the tray status panel, in-app approval option, and live logs in Settings. Version 0.3.6 refines the interface with Tempo's charcoal-and-coral layout and Daylight's editorial heading font; files are shown in a compact list with their photo previews. Remove **SwooshDrop** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
 
 ## Validation and limits
 

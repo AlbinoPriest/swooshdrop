@@ -7,7 +7,7 @@ Add-Type -AssemblyName System.Drawing
 $bitmap = New-Object Drawing.Bitmap 64,64
 $graphics = [Drawing.Graphics]::FromImage($bitmap)
 $graphics.SmoothingMode = 'AntiAlias'
-$graphics.Clear([Drawing.Color]::FromArgb(51,122,245))
+$graphics.Clear([Drawing.Color]::FromArgb(238,114,93))
 $pen = New-Object Drawing.Pen ([Drawing.Color]::White),5
 $pen.StartCap = 'Round'; $pen.EndCap = 'Round'; $pen.LineJoin = 'Round'
 $graphics.DrawLine($pen,32,13,32,43); $graphics.DrawLine($pen,19,32,32,45); $graphics.DrawLine($pen,32,45,45,32)

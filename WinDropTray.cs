@@ -26,8 +26,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.5.0")]
-[assembly: AssemblyFileVersion("0.3.5.0")]
+[assembly: AssemblyVersion("0.3.6.0")]
+[assembly: AssemblyFileVersion("0.3.6.0")]
 
 public class Preferences
 {
@@ -235,12 +235,16 @@ public sealed class WinDropTray
         foreach (string page in new string[] { "Received", "Settings", "About" })
         {
             ((UIElement)window.FindName(page + "Page")).Visibility = page == name ? Visibility.Visible : Visibility.Collapsed;
-            Find<Button>(page + "Nav").Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#2B3645" : "#171C24"));
+            var nav = Find<Button>(page + "Nav");
+            nav.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#4A3834" : "#2E2927"));
+            nav.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#F6F0E9" : "#D5CBC4"));
+            nav.BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EE725D"));
+            nav.BorderThickness = page == name ? new Thickness(3, 0, 0, 0) : new Thickness(0);
         }
         var title = Find<TextBlock>("PageTitleText");
         var subtitle = Find<TextBlock>("PageSubtitleText");
-        if (title != null) title.Text = name;
-        if (subtitle != null) subtitle.Text = name == "Received" ? "Your files and links from iPhone, in one place." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
+        if (title != null) title.Text = name == "Received" ? "Send it. Got it." : name == "Settings" ? "Make it yours." : "About SwooshDrop.";
+        if (subtitle != null) subtitle.Text = name == "Received" ? "A direct route from your iPhone to this PC." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
         if (name == "Settings") RefreshLogView();
     }
     void ShowWindow() { HideTrayFlyout(); window.Show(); window.WindowState = WindowState.Normal; window.Activate(); }
@@ -311,7 +315,7 @@ public sealed class WinDropTray
     void SetStatus(string title, string detail, bool ready)
     {
         Find<TextBlock>("StatusText").Text = title; Find<TextBlock>("StatusDetail").Text = detail;
-        Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#8CB8FF" : "#8794A5"));
+        Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#EE725D" : "#A7988F"));
         Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving";
         Find<Button>("ReceiveButton").IsEnabled = !busy;
         if (!rendering) tray.Text = "SwooshDrop · " + title.Substring(0, Math.Min(48, title.Length));

@@ -3,76 +3,74 @@
         Title="SwooshDrop" Width="350" Height="428"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
         Background="Transparent" ShowInTaskbar="False" Topmost="True"
-        FontFamily="Segoe UI" Foreground="#F1F4F9" UseLayoutRounding="True">
+        FontFamily="Segoe UI" Foreground="#F6F0E9" UseLayoutRounding="True">
  <Window.Resources>
   <Style TargetType="Button">
    <Setter Property="Cursor" Value="Hand"/>
    <Setter Property="FontSize" Value="12"/>
    <Setter Property="FontWeight" Value="SemiBold"/>
-   <Setter Property="Background" Value="#29323E"/>
-   <Setter Property="Foreground" Value="#F1F4F9"/>
-   <Setter Property="BorderBrush" Value="#455266"/>
+   <Setter Property="Background" Value="#3D3330"/>
+   <Setter Property="Foreground" Value="#F6F0E9"/>
+   <Setter Property="BorderBrush" Value="#79645B"/>
    <Setter Property="BorderThickness" Value="1"/>
    <Setter Property="Template">
     <Setter.Value><ControlTemplate TargetType="Button">
      <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-             BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
+             BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="2">
       <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
      </Border>
      <ControlTemplate.Triggers>
       <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.82"/></Trigger>
       <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.64"/></Trigger>
-      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#A9C8FF"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#F49A83"/></Trigger>
       <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.45"/></Trigger>
      </ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value>
    </Setter>
   </Style>
  </Window.Resources>
- <Border Background="#1B2028" BorderBrush="#475366" BorderThickness="1" CornerRadius="12" Padding="18">
+ <Border Background="#302A29" BorderBrush="#7D685E" BorderThickness="1" CornerRadius="4" Padding="18">
   <Border.Effect><DropShadowEffect BlurRadius="20" ShadowDepth="4" Color="#000000" Opacity="0.42"/></Border.Effect>
   <Grid>
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
    <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-    <Border Width="27" Height="27" Background="#334761" CornerRadius="7">
-     <TextBlock Text="↘" Foreground="#A9C8FF" FontFamily="Segoe UI Symbol" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
-    </Border>
+    <TextBlock Text="↘" Foreground="#EE725D" FontFamily="Segoe UI Symbol" FontSize="20" VerticalAlignment="Center"/>
     <TextBlock Grid.Column="1" Text="SwooshDrop" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"/>
     <Button x:Name="FlyoutCloseButton" Grid.Column="2" Content="×" Width="26" Height="26" FontSize="17" FontWeight="Normal"
-            BorderThickness="0" Background="Transparent" Foreground="#A0ABBA" ToolTip="Close"/>
+            BorderThickness="0" Background="Transparent" Foreground="#BBAFA7" ToolTip="Close"/>
    </Grid>
-   <Border Grid.Row="1" Background="#222D3B" BorderBrush="#39506D" BorderThickness="1" CornerRadius="9" Padding="13" Margin="0,15,0,0">
+   <Border Grid.Row="1" Background="#3F312C" BorderBrush="#8A5E50" BorderThickness="1" CornerRadius="3" Padding="13" Margin="0,15,0,0">
     <Grid>
      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Ellipse x:Name="FlyoutStatusDot" Width="9" Height="9" Fill="#8794A5" VerticalAlignment="Top" Margin="0,5,11,0"/>
+     <Ellipse x:Name="FlyoutStatusDot" Width="9" Height="9" Fill="#A7988F" VerticalAlignment="Top" Margin="0,5,11,0"/>
      <StackPanel Grid.Column="1">
-      <TextBlock x:Name="FlyoutStatusText" Text="Ready when you are" FontSize="14" FontWeight="SemiBold"/>
-      <TextBlock x:Name="FlyoutStatusDetail" Text="Connect your adapter and start receiving." FontSize="11" Foreground="#AAB6C5" Margin="0,5,0,0" TextWrapping="Wrap"/>
+      <TextBlock x:Name="FlyoutStatusText" Text="Ready when you are" FontFamily="Georgia" FontSize="17"/>
+      <TextBlock x:Name="FlyoutStatusDetail" Text="Connect your adapter and start receiving." FontSize="11" Foreground="#D1BFB4" Margin="0,5,0,0" TextWrapping="Wrap"/>
      </StackPanel>
     </Grid>
    </Border>
    <Button x:Name="FlyoutReceiveButton" Grid.Row="2" Content="Start receiving" Height="38" Margin="0,12,0,0"
-           Background="#8CB8FF" Foreground="#112033" BorderThickness="0"/>
-   <Border Grid.Row="3" BorderBrush="#303946" BorderThickness="0,0,0,1" Padding="0,15,0,14">
+           Background="#EE725D" Foreground="#2D211E" BorderThickness="0"/>
+   <Border Grid.Row="3" BorderBrush="#5D504B" BorderThickness="0,0,0,1" Padding="0,15,0,14">
     <Grid>
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <StackPanel>
-      <TextBlock Text="LAST RECEIVED" FontSize="10" FontWeight="SemiBold" Foreground="#91A0B2"/>
+      <TextBlock Text="LAST RECEIVED" FontSize="10" FontWeight="SemiBold" Foreground="#B9A8A0"/>
       <TextBlock x:Name="FlyoutLastText" Text="No transfers yet" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,7,0,0"/>
      </StackPanel>
-     <TextBlock x:Name="FlyoutCountText" Grid.Column="1" Text="0 items" FontSize="11" Foreground="#A0ABBA" VerticalAlignment="Bottom"/>
+     <TextBlock x:Name="FlyoutCountText" Grid.Column="1" Text="0 items" FontSize="11" Foreground="#BBAFA7" VerticalAlignment="Bottom"/>
     </Grid>
    </Border>
-   <Border Grid.Row="4" BorderBrush="#303946" BorderThickness="0,0,0,1" Padding="0,14,0,13">
+   <Border Grid.Row="4" BorderBrush="#5D504B" BorderThickness="0,0,0,1" Padding="0,14,0,13">
     <StackPanel>
      <Grid>
-      <TextBlock Text="Adapter" FontSize="11" Foreground="#A0ABBA"/>
-      <TextBlock x:Name="FlyoutAdapterText" Text="Checking…" FontSize="11" Foreground="#E0E8F2" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="210"/>
+      <TextBlock Text="Adapter" FontSize="11" Foreground="#BBAFA7"/>
+      <TextBlock x:Name="FlyoutAdapterText" Text="Checking…" FontSize="11" Foreground="#F0E4DC" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="210"/>
      </Grid>
      <Grid Margin="0,10,0,0">
-      <TextBlock Text="Runtime" FontSize="11" Foreground="#A0ABBA"/>
-      <TextBlock x:Name="FlyoutRuntimeText" Text="Stopped" FontSize="11" Foreground="#E0E8F2" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="210"/>
+      <TextBlock Text="Runtime" FontSize="11" Foreground="#BBAFA7"/>
+      <TextBlock x:Name="FlyoutRuntimeText" Text="Stopped" FontSize="11" Foreground="#F0E4DC" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="210"/>
      </Grid>
     </StackPanel>
    </Border>

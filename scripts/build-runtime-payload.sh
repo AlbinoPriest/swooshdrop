@@ -50,7 +50,7 @@ for driver in ('8188eu','mt76x0u','mt76x2u','mt7601u','rtl8xxxu'):
 for key in (('0bda','b720'),('7392','a611')): profiles.pop(key,None)
 (repo/'adapters.json').write_text(json.dumps(list(profiles.values()),indent=2)+'\n')
 print('Catalog entries:',len(profiles))
-(base/'runtime.json').write_text(json.dumps(dict(version='0.3.5',kernel='6.18.33.2-microsoft-standard-WSL2',architecture='x86_64'))+'\n')
+(base/'runtime.json').write_text(json.dumps(dict(version='0.3.6',kernel='6.18.33.2-microsoft-standard-WSL2',architecture='x86_64'))+'\n')
 PY
 tar -C "$stage" -czf "$repo/obj/runtime-payload.tar.gz" opt
 echo "Runtime payload: $repo/obj/runtime-payload.tar.gz"

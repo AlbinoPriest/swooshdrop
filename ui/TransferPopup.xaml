@@ -3,64 +3,62 @@
         Title="Incoming transfer — SwooshDrop" Width="390" Height="424"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
         Background="Transparent" ShowInTaskbar="False" Topmost="True"
-        FontFamily="Segoe UI" Foreground="#F1F4F9" UseLayoutRounding="True">
+        FontFamily="Segoe UI" Foreground="#F6F0E9" UseLayoutRounding="True">
  <Window.Resources>
   <Style TargetType="Button">
    <Setter Property="Cursor" Value="Hand"/>
    <Setter Property="FontSize" Value="13"/>
    <Setter Property="FontWeight" Value="SemiBold"/>
-   <Setter Property="Background" Value="#29323E"/>
-   <Setter Property="Foreground" Value="#F1F4F9"/>
-   <Setter Property="BorderBrush" Value="#455266"/>
+   <Setter Property="Background" Value="#3D3330"/>
+   <Setter Property="Foreground" Value="#F6F0E9"/>
+   <Setter Property="BorderBrush" Value="#79645B"/>
    <Setter Property="BorderThickness" Value="1"/>
    <Setter Property="Template">
     <Setter.Value><ControlTemplate TargetType="Button">
      <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-             BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+             BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="2">
       <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
      </Border>
      <ControlTemplate.Triggers>
       <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.84"/></Trigger>
       <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.65"/></Trigger>
-      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#A9C8FF"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#F49A83"/></Trigger>
      </ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value>
    </Setter>
   </Style>
  </Window.Resources>
- <Border Background="#1B2028" BorderBrush="#475366" BorderThickness="1" CornerRadius="13" Padding="20">
+ <Border Background="#302A29" BorderBrush="#7D685E" BorderThickness="1" CornerRadius="4" Padding="20">
   <Border.Effect><DropShadowEffect BlurRadius="20" ShadowDepth="4" Color="#000000" Opacity="0.42"/></Border.Effect>
   <Grid>
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
    <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-    <Border Width="25" Height="25" Background="#334761" CornerRadius="7" VerticalAlignment="Center">
-     <TextBlock Text="↘" Foreground="#A9C8FF" FontFamily="Segoe UI Symbol" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
-    </Border>
-    <TextBlock Grid.Column="1" Text="SwooshDrop" Foreground="#CDD8E6" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="9,0,0,0"/>
-    <TextBlock x:Name="CountdownText" Grid.Column="2" Text="55s" Foreground="#A0ABBA" FontSize="11" VerticalAlignment="Center"/>
+    <TextBlock Text="↘" Foreground="#EE725D" FontFamily="Segoe UI Symbol" FontSize="20" VerticalAlignment="Center"/>
+    <TextBlock Grid.Column="1" Text="SWOOSHDROP / INCOMING" Foreground="#EDE0D6" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="9,0,0,0"/>
+    <TextBlock x:Name="CountdownText" Grid.Column="2" Text="55s" Foreground="#BBAFA7" FontSize="11" VerticalAlignment="Center"/>
    </Grid>
    <StackPanel Grid.Row="1" Margin="0,17,0,15">
-    <TextBlock Text="Incoming transfer" FontSize="22" FontWeight="SemiBold"/>
-    <TextBlock x:Name="SenderText" Text="Your iPhone wants to share" Foreground="#AAB6C5" FontSize="12" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+    <TextBlock Text="Incoming AirDrop" FontFamily="Georgia" FontSize="26"/>
+    <TextBlock x:Name="SenderText" Text="Your iPhone wants to share" Foreground="#D1BFB4" FontSize="12" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
    </StackPanel>
-   <Border Grid.Row="2" Background="#222B37" BorderBrush="#39485C" BorderThickness="1" CornerRadius="9" ClipToBounds="True">
+   <Border Grid.Row="2" Background="#3A302D" BorderBrush="#765B50" BorderThickness="1" CornerRadius="2" ClipToBounds="True">
     <Grid>
-     <TextBlock x:Name="PreviewGlyph" Text="↘" FontFamily="Segoe UI Symbol" FontSize="48" Foreground="#9EC3FF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+     <TextBlock x:Name="PreviewGlyph" Text="↘" FontFamily="Segoe UI Symbol" FontSize="48" Foreground="#F49A83" HorizontalAlignment="Center" VerticalAlignment="Center"/>
      <Image x:Name="PreviewImage" Stretch="Uniform"/>
      <TextBox x:Name="LinkText" Background="Transparent" BorderThickness="0" TextWrapping="Wrap" IsReadOnly="True"
-              FontSize="14" Foreground="#A9C8FF" CaretBrush="#A9C8FF" Margin="16" VerticalAlignment="Center" Visibility="Collapsed"
+              FontSize="14" Foreground="#F49A83" CaretBrush="#F49A83" Margin="16" VerticalAlignment="Center" Visibility="Collapsed"
               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
     </Grid>
    </Border>
    <StackPanel Grid.Row="3" Margin="0,14,0,14">
     <TextBlock x:Name="FilesText" Text="Photo.heic" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-    <TextBlock Text="Only accept a transfer you expect." FontSize="11" Foreground="#A0ABBA" Margin="0,5,0,0"/>
+    <TextBlock Text="Only accept a transfer you expect." FontSize="11" Foreground="#BBAFA7" Margin="0,5,0,0"/>
    </StackPanel>
    <Grid Grid.Row="4">
     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
     <Button x:Name="DeclineButton" Content="Decline" Height="40"/>
-    <Button x:Name="AcceptButton" Grid.Column="2" Content="Accept" Height="40" Background="#8CB8FF" Foreground="#112033" BorderThickness="0"/>
+    <Button x:Name="AcceptButton" Grid.Column="2" Content="Accept" Height="40" Background="#EE725D" Foreground="#2D211E" BorderThickness="0"/>
    </Grid>
   </Grid>
  </Border>
