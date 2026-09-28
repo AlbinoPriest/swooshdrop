@@ -33,6 +33,7 @@ public class Preferences
 {
     public string SaveFolder { get; set; }
     public bool ReceiveOnLaunch { get; set; }
+    public bool PauseAtSignIn { get; set; }
     public bool Notifications { get; set; }
     public string NotificationMode { get; set; }
     public bool OpenLinksOnReceive { get; set; }
@@ -125,19 +126,28 @@ public sealed class WinDropTray
             ToastActivation.OnActivated = delegate(string activation) { app.OnUi(delegate { app.Activate(activation); }); };
             int toastCookie = ToastActivation.RegisterServer();
             string import = Option(args, "--import"); if (!string.IsNullOrEmpty(import)) app.ImportFolder(import);
-            app.QueueMissingPreviews();
             bool background = Array.IndexOf(args, "--background") >= 0;
+            bool startReceiving = settingsStart(app, args);
+            // Preview generation uses WSL too. A paused launch must leave the runtime asleep.
+            if (startReceiving) app.QueueMissingPreviews();
             if (!background) app.window.Show();
             app.window.Dispatcher.BeginInvoke(new Action(async delegate
             {
-                if (settingsStart(app, args)) { app.receivingIntent = true; await app.StartReceiving(); }
+                if (startReceiving) { app.receivingIntent = true; await app.StartReceiving(); }
+                else if (background && app.settings.PauseAtSignIn)
+                    app.SetStatus("Receiving paused", "Started with Windows without waking WSL. Press Start receiving when you want to AirDrop.", false);
                 if (args.Length > 0 && args[0].StartsWith("windrop://", StringComparison.OrdinalIgnoreCase)) app.Activate(args[0]);
             }), DispatcherPriority.ApplicationIdle);
             try { application.Run(); } finally { ToastActivation.UnregisterServer(toastCookie); }
         }
     }
 
-    static bool settingsStart(WinDropTray app, string[] args) { return app.settings.ReceiveOnLaunch || Array.IndexOf(args, "--start") >= 0; }
+    static bool settingsStart(WinDropTray app, string[] args)
+    {
+        if (Array.IndexOf(args, "--start") >= 0) return true;
+        if (Array.IndexOf(args, "--background") >= 0 && app.settings.PauseAtSignIn) return false;
+        return app.settings.ReceiveOnLaunch;
+    }
     static string Option(string[] args, string name) { int at = Array.IndexOf(args, name); return at >= 0 && at + 1 < args.Length ? args[at + 1] : null; }
     T Find<T>(string name) where T : class { return window.FindName(name) as T; }
 
@@ -183,6 +193,7 @@ public sealed class WinDropTray
         Find<ItemsControl>("Transfers").AddHandler(Button.ClickEvent, new RoutedEventHandler(OpenItem));
         loadingSettings = true;
         Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled();
+        Find<CheckBox>("PauseAtSignInCheck").IsChecked = settings.PauseAtSignIn;
         Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked = settings.ReceiveOnLaunch;
         Find<RadioButton>("WindowsNotificationRadio").IsChecked = NotificationMode == "windows";
         Find<RadioButton>("AppPopupRadio").IsChecked = NotificationMode == "app";
@@ -195,6 +206,7 @@ public sealed class WinDropTray
             try { NativeIntegration.SetAutostart(exe, Find<CheckBox>("AutostartCheck").IsChecked == true); }
             catch (Exception ex) { Log("Autostart: " + ex.Message); Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled(); MessageBox.Show("Windows could not save the startup setting.", "SwooshDrop"); }
         };
+        Find<CheckBox>("PauseAtSignInCheck").Click += delegate { settings.PauseAtSignIn = Find<CheckBox>("PauseAtSignInCheck").IsChecked == true; SaveSettings(); };
         Find<CheckBox>("ReceiveOnLaunchCheck").Click += delegate { settings.ReceiveOnLaunch = Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked == true; SaveSettings(); };
         Find<RadioButton>("WindowsNotificationRadio").Click += delegate { SetNotificationMode("windows"); };
         Find<RadioButton>("AppPopupRadio").Click += delegate { SetNotificationMode("app"); };

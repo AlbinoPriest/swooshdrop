@@ -270,8 +270,12 @@
       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="4" Padding="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
         <TextBlock Text="Startup" FontFamily="Georgia" FontSize="20" Margin="0,0,0,8"/>
-        <CheckBox x:Name="AutostartCheck" Content="Start SwooshDrop when I sign in to Windows"/>
-        <CheckBox x:Name="ReceiveOnLaunchCheck" Content="Start receiving when SwooshDrop opens"/>
+        <CheckBox x:Name="AutostartCheck" Content="Open SwooshDrop in the tray when I sign in"/>
+        <CheckBox x:Name="PauseAtSignInCheck" Content="Keep receiving paused at sign-in (uses less memory)" Margin="0,2,0,0"
+                  IsEnabled="{Binding IsChecked, ElementName=AutostartCheck}"/>
+        <TextBlock Text="Start receiving from the tray when needed. SwooshDrop won't appear in AirDrop while paused."
+                   TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="27,0,0,10"/>
+        <CheckBox x:Name="ReceiveOnLaunchCheck" Content="Start receiving on a fresh manual launch"/>
        </StackPanel>
       </Border>
       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="4" Padding="22" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
