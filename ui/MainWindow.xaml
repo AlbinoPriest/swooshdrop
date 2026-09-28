@@ -1,23 +1,23 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SwooshDrop" Width="1080" Height="740" MinWidth="850" MinHeight="620"
-        WindowStartupLocation="CenterScreen" Background="#101419"
-        FontFamily="Segoe UI" Foreground="#EDF2EF">
+        WindowStartupLocation="CenterScreen" Background="#101318"
+        FontFamily="Segoe UI" Foreground="#F1F4F9" UseLayoutRounding="True">
  <Window.Resources>
-  <SolidColorBrush x:Key="CanvasBrush" Color="#101419"/>
-  <SolidColorBrush x:Key="SurfaceBrush" Color="#1A2025"/>
-  <SolidColorBrush x:Key="RaisedBrush" Color="#242B2F"/>
-  <SolidColorBrush x:Key="LineBrush" Color="#374046"/>
-  <SolidColorBrush x:Key="MutedBrush" Color="#A5B3B4"/>
-  <SolidColorBrush x:Key="AccentBrush" Color="#C8EF70"/>
+  <SolidColorBrush x:Key="CanvasBrush" Color="#101318"/>
+  <SolidColorBrush x:Key="SurfaceBrush" Color="#1B2028"/>
+  <SolidColorBrush x:Key="RaisedBrush" Color="#232A34"/>
+  <SolidColorBrush x:Key="LineBrush" Color="#303946"/>
+  <SolidColorBrush x:Key="MutedBrush" Color="#A0ABBA"/>
+  <SolidColorBrush x:Key="AccentBrush" Color="#8CB8FF"/>
   <Style TargetType="Button">
    <Setter Property="Cursor" Value="Hand"/>
    <Setter Property="FontSize" Value="13"/>
    <Setter Property="FontWeight" Value="SemiBold"/>
    <Setter Property="Padding" Value="16,10"/>
-   <Setter Property="Background" Value="#242B2F"/>
-   <Setter Property="Foreground" Value="#EDF2EF"/>
-   <Setter Property="BorderBrush" Value="#435057"/>
+   <Setter Property="Background" Value="#232A34"/>
+   <Setter Property="Foreground" Value="#F1F4F9"/>
+   <Setter Property="BorderBrush" Value="#3B4655"/>
    <Setter Property="BorderThickness" Value="1"/>
    <Setter Property="Template">
     <Setter.Value><ControlTemplate TargetType="Button">
@@ -29,13 +29,83 @@
       <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.82"/></Trigger>
       <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.65"/></Trigger>
       <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.42"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#8CB8FF"/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value>
+   </Setter>
+  </Style>
+  <Style TargetType="RadioButton">
+   <Setter Property="FontSize" Value="13"/>
+   <Setter Property="Foreground" Value="#E9EDF4"/>
+   <Setter Property="Cursor" Value="Hand"/>
+   <Setter Property="Template">
+    <Setter.Value><ControlTemplate TargetType="RadioButton">
+     <Border x:Name="Card" Background="#202630" BorderBrush="#394353" BorderThickness="1" CornerRadius="9" Padding="15,12">
+      <Grid>
+       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Border x:Name="Circle" Width="17" Height="17" CornerRadius="9" BorderBrush="#8D9AAC" BorderThickness="1.5" VerticalAlignment="Center" Margin="0,0,12,0">
+        <Ellipse x:Name="Mark" Width="7" Height="7" Fill="#8CB8FF" Visibility="Collapsed"/>
+       </Border>
+       <ContentPresenter Grid.Column="1" ContentSource="Content" VerticalAlignment="Center"/>
+      </Grid>
+     </Border>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="#26374E"/><Setter TargetName="Card" Property="BorderBrush" Value="#8CB8FF"/><Setter TargetName="Circle" Property="BorderBrush" Value="#8CB8FF"/><Setter TargetName="Mark" Property="Visibility" Value="Visible"/></Trigger>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="#9FB4D0"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="#B7D2FF"/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value>
+   </Setter>
+  </Style>
+  <Style TargetType="ComboBoxItem">
+   <Setter Property="Foreground" Value="#E6ECF4"/>
+   <Setter Property="Background" Value="#232A34"/>
+   <Setter Property="Padding" Value="11,8"/>
+   <Setter Property="Template">
+    <Setter.Value><ControlTemplate TargetType="ComboBoxItem">
+     <Border x:Name="ItemSurface" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+      <ContentPresenter/>
+     </Border>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemSurface" Property="Background" Value="#34465E"/></Trigger>
+      <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemSurface" Property="Background" Value="#34465E"/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value>
+   </Setter>
+  </Style>
+  <Style TargetType="ComboBox">
+   <Setter Property="Foreground" Value="#E6ECF4"/>
+   <Setter Property="Background" Value="#28313D"/>
+   <Setter Property="BorderBrush" Value="#3B4655"/>
+   <Setter Property="Template">
+    <Setter.Value><ControlTemplate TargetType="ComboBox">
+     <Grid>
+      <Border x:Name="ComboSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="7">
+       <Grid>
+        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" Margin="11,0,25,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+        <TextBlock Text="⌄" Foreground="#B6C6D9" FontSize="17" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,-5,9,0"/>
+       </Grid>
+      </Border>
+      <ToggleButton Focusable="False" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                    IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+       <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent"/></ControlTemplate></ToggleButton.Template>
+      </ToggleButton>
+      <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False" StaysOpen="False">
+       <Border Background="#232A34" BorderBrush="#475366" BorderThickness="1" CornerRadius="7" Width="135" Margin="0,3,0,0">
+        <ScrollViewer MaxHeight="190" CanContentScroll="True"><ItemsPresenter/></ScrollViewer>
+       </Border>
+      </Popup>
+     </Grid>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ComboSurface" Property="BorderBrush" Value="#8CB8FF"/></Trigger>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboSurface" Property="BorderBrush" Value="#7288A4"/></Trigger>
      </ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value>
    </Setter>
   </Style>
   <Style TargetType="CheckBox">
    <Setter Property="FontSize" Value="14"/>
-   <Setter Property="Foreground" Value="#EDF2EF"/>
+   <Setter Property="Foreground" Value="#F1F4F9"/>
    <Setter Property="Margin" Value="0,6"/>
    <Setter Property="MinHeight" Value="28"/>
    <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -43,9 +113,9 @@
     <Setter.Value><ControlTemplate TargetType="CheckBox">
      <Border x:Name="FocusRing" BorderBrush="Transparent" BorderThickness="2" CornerRadius="6" Padding="2">
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-       <Border x:Name="Box" Width="18" Height="18" CornerRadius="4" Background="#252F2E"
-               BorderBrush="#7A8D85" BorderThickness="1">
-        <Path x:Name="Tick" Data="M 3,9 L 7,13 L 15,5" Stroke="#172018" StrokeThickness="2.3"
+       <Border x:Name="Box" Width="18" Height="18" CornerRadius="4" Background="#202732"
+               BorderBrush="#778396" BorderThickness="1">
+        <Path x:Name="Tick" Data="M 3,9 L 7,13 L 15,5" Stroke="#112033" StrokeThickness="2.3"
               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
               Visibility="Collapsed"/>
        </Border>
@@ -55,12 +125,12 @@
      </Border>
      <ControlTemplate.Triggers>
       <Trigger Property="IsChecked" Value="True">
-       <Setter TargetName="Box" Property="Background" Value="#C8EF70"/>
-       <Setter TargetName="Box" Property="BorderBrush" Value="#C8EF70"/>
+       <Setter TargetName="Box" Property="Background" Value="#8CB8FF"/>
+       <Setter TargetName="Box" Property="BorderBrush" Value="#8CB8FF"/>
        <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
       </Trigger>
-      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="#C8EF70"/></Trigger>
-      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="BorderBrush" Value="#C8EF70"/></Trigger>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="#8CB8FF"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="BorderBrush" Value="#8CB8FF"/></Trigger>
       <Trigger Property="IsEnabled" Value="False"><Setter TargetName="FocusRing" Property="Opacity" Value="0.45"/></Trigger>
      </ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value>
@@ -71,14 +141,14 @@
    <Setter Property="Background" Value="Transparent"/>
    <Setter Property="Template">
     <Setter.Value><ControlTemplate TargetType="ScrollBar">
-     <Grid Background="#1A2025" Width="10">
+     <Grid Background="#1B2028" Width="10">
       <Track x:Name="PART_Track" IsDirectionReversed="True" Maximum="{TemplateBinding Maximum}"
              Minimum="{TemplateBinding Minimum}" Value="{TemplateBinding Value}"
              ViewportSize="{TemplateBinding ViewportSize}">
        <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0"/></Track.DecreaseRepeatButton>
        <Track.Thumb>
         <Thumb>
-         <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#596967" CornerRadius="4" Margin="2,0"/></ControlTemplate></Thumb.Template>
+         <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#586575" CornerRadius="4" Margin="2,0"/></ControlTemplate></Thumb.Template>
         </Thumb>
        </Track.Thumb>
        <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0"/></Track.IncreaseRepeatButton>
@@ -90,31 +160,32 @@
  </Window.Resources>
  <Grid Background="{StaticResource CanvasBrush}">
   <Grid.ColumnDefinitions><ColumnDefinition Width="216"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-  <Border Background="#151A1E" BorderBrush="#30383B" BorderThickness="0,0,1,0">
-   <Grid Margin="22,26,18,22">
+  <Border Background="#15191F" BorderBrush="#2B333F" BorderThickness="0,0,1,0">
+   <Grid Margin="18,24,18,20">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <StackPanel>
-     <Grid Width="48" Height="48" HorizontalAlignment="Left">
-      <Border Background="#C8EF70" CornerRadius="13"/>
-      <TextBlock Text="↘" Foreground="#172018" FontFamily="Segoe UI Symbol" FontSize="30" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-3,0,0"/>
-     </Grid>
-     <TextBlock Text="SwooshDrop" FontSize="24" FontWeight="SemiBold" Margin="0,17,0,4"/>
-     <TextBlock Text="IPHONE  →  WINDOWS" FontSize="10" FontWeight="SemiBold" Foreground="#A5B3B4"/>
+    <StackPanel Margin="7,0,0,0">
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <Border Background="#334761" Width="34" Height="34" CornerRadius="9">
+       <TextBlock Text="↘" Foreground="#A9C8FF" FontFamily="Segoe UI Symbol" FontSize="21" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+      </Border>
+      <TextBlock Text="SwooshDrop" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" Margin="11,0,0,0"/>
+     </StackPanel>
+     <TextBlock Text="AirDrop for your PC" FontSize="11" Foreground="#A0ABBA" Margin="45,8,0,0"/>
     </StackPanel>
-    <StackPanel Grid.Row="1" Margin="0,52,0,0">
-     <TextBlock Text="WORKSPACE" Foreground="#7F9193" FontSize="10" FontWeight="SemiBold" Margin="10,0,0,12"/>
-     <Button x:Name="ReceivedNav" Content="↓    Received" HorizontalContentAlignment="Left" Background="#303B3A" Foreground="#DDF3AB" BorderThickness="0" Margin="0,0,0,8"/>
-     <Button x:Name="SettingsNav" Content="⚙    Settings" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B7C3C3" BorderThickness="0" Margin="0,0,0,8"/>
-     <Button x:Name="AboutNav" Content="ⓘ    About" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B7C3C3" BorderThickness="0"/>
+    <StackPanel Grid.Row="1" Margin="0,53,0,0">
+     <TextBlock Text="WORKSPACE" Foreground="#8794A5" FontSize="10" FontWeight="SemiBold" Margin="13,0,0,12"/>
+     <Button x:Name="ReceivedNav" Content="↓    Received" HorizontalContentAlignment="Left" Background="#273648" Foreground="#D9E9FF" BorderThickness="0" Margin="0,0,0,4" Padding="14,12"/>
+     <Button x:Name="SettingsNav" Content="⚙    Settings" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B4BECA" BorderThickness="0" Margin="0,0,0,4" Padding="14,12"/>
+     <Button x:Name="AboutNav" Content="ⓘ    About" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B4BECA" BorderThickness="0" Padding="14,12"/>
     </StackPanel>
     <StackPanel Grid.Row="3">
-     <Border Background="#202927" BorderBrush="#405048" BorderThickness="1" CornerRadius="10" Padding="13">
+     <Border Background="#1E2732" BorderBrush="#344254" BorderThickness="1" CornerRadius="10" Padding="13">
       <StackPanel>
-       <TextBlock Text="READY FOR YOUR NEXT DROP" Foreground="#C8EF70" FontWeight="SemiBold" FontSize="10"/>
-       <TextBlock Text="Share straight from iPhone." Foreground="#B9C8C1" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"/>
+       <TextBlock Text="RECEIVE FROM IPHONE" Foreground="#A9C8FF" FontWeight="SemiBold" FontSize="10"/>
+       <TextBlock Text="Share → AirDrop → SwooshDrop" Foreground="#C0CAD6" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
-     <TextBlock Text="SwooshDrop 0.3.4 beta" Foreground="#819294" FontSize="10" Margin="0,16,0,0"/>
+     <TextBlock Text="SwooshDrop beta" Foreground="#8794A5" FontSize="10" Margin="7,16,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
@@ -123,8 +194,8 @@
    <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <StackPanel>
-     <TextBlock Text="Your AirDrop workspace" FontSize="30" FontWeight="SemiBold"/>
-     <TextBlock Text="Send from iPhone. Receive on Windows." FontSize="13" Foreground="#A5B3B4" Margin="0,5,0,0"/>
+     <TextBlock x:Name="PageTitleText" Text="Received" FontSize="29" FontWeight="SemiBold"/>
+     <TextBlock x:Name="PageSubtitleText" Text="Your files and links from iPhone, in one place." FontSize="13" Foreground="#A0ABBA" Margin="0,5,0,0"/>
     </StackPanel>
     <Button x:Name="FolderButton" Grid.Column="1" Content="Open folder  ↗" VerticalAlignment="Center"/>
    </Grid>
@@ -134,13 +205,13 @@
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <StackPanel>
       <StackPanel Orientation="Horizontal">
-       <Ellipse x:Name="StatusDot" Width="9" Height="9" Fill="#819294" Margin="0,0,11,0"/>
+       <Ellipse x:Name="StatusDot" Width="9" Height="9" Fill="#8794A5" Margin="0,0,11,0"/>
        <TextBlock x:Name="StatusText" Text="Ready when you are" FontSize="15" FontWeight="SemiBold"/>
       </StackPanel>
       <TextBlock x:Name="StatusDetail" Text="Connect your adapter and start receiving." Foreground="{StaticResource MutedBrush}"
                  FontSize="12" Margin="20,7,16,0" TextWrapping="Wrap" MaxWidth="425"/>
      </StackPanel>
-     <Button x:Name="ReceiveButton" Grid.Column="1" Content="Start receiving" Background="#C8EF70" Foreground="#182219"
+     <Button x:Name="ReceiveButton" Grid.Column="1" Content="Start receiving" Background="#8CB8FF" Foreground="#112033"
              BorderThickness="0" VerticalAlignment="Center" MinWidth="150"/>
     </Grid>
    </Border>
@@ -148,26 +219,26 @@
     <Grid x:Name="ReceivedPage">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
      <Grid Margin="0,0,0,15">
-      <TextBlock Text="YOUR TRANSFERS" Foreground="#C5D4D0" FontSize="11" FontWeight="SemiBold"/>
+       <TextBlock Text="Recent transfers" Foreground="#DCE3EB" FontSize="15" FontWeight="SemiBold"/>
       <TextBlock x:Name="CountText" Text="0 items" HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="12"/>
      </Grid>
-     <Border x:Name="PendingBanner" Grid.Row="1" Background="#27332C" BorderBrush="#5B794A" BorderThickness="1"
+     <Border x:Name="PendingBanner" Grid.Row="1" Background="#223349" BorderBrush="#5478A3" BorderThickness="1"
              CornerRadius="10" Padding="14" Visibility="Collapsed" Margin="0,0,0,15">
       <Grid>
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-       <TextBlock x:Name="PendingText" Text="Incoming AirDrop" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#EDF2EF"/>
+       <TextBlock x:Name="PendingText" Text="Incoming AirDrop" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#F1F4F9"/>
        <Button x:Name="BannerDecline" Grid.Column="1" Content="Decline" Margin="10,0,8,0" Padding="12,7"/>
-       <Button x:Name="BannerAccept" Grid.Column="2" Content="Accept" Background="#C8EF70" Foreground="#182219" BorderThickness="0" Padding="12,7"/>
+       <Button x:Name="BannerAccept" Grid.Column="2" Content="Accept" Background="#8CB8FF" Foreground="#112033" BorderThickness="0" Padding="12,7"/>
       </Grid>
      </Border>
      <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <Grid>
        <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,58,0,0">
-        <Border Background="#263129" BorderBrush="#455A3C" BorderThickness="1" Width="88" Height="88" CornerRadius="26">
-         <TextBlock Text="↘" Foreground="#C8EF70" FontFamily="Segoe UI Symbol" FontSize="49" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-5,0,0"/>
+        <Border Background="#1D2A39" BorderBrush="#354C68" BorderThickness="1" Width="88" Height="88" CornerRadius="26">
+         <TextBlock Text="↘" Foreground="#8CB8FF" FontFamily="Segoe UI Symbol" FontSize="49" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-5,0,0"/>
         </Border>
-        <TextBlock Text="Waiting for a drop" FontSize="20" FontWeight="SemiBold" Margin="0,21,0,8" HorizontalAlignment="Center"/>
-        <TextBlock Text="On iPhone: Share → AirDrop → SwooshDrop" Foreground="{StaticResource MutedBrush}" FontSize="13" HorizontalAlignment="Center"/>
+        <TextBlock Text="Nothing here yet" FontSize="19" FontWeight="SemiBold" Margin="0,21,0,8" HorizontalAlignment="Center"/>
+        <TextBlock Text="Choose SwooshDrop in your iPhone’s AirDrop menu." Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center"/>
        </StackPanel>
        <ItemsControl x:Name="Transfers">
         <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -176,11 +247,11 @@
           <Border Width="218" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}"
                   BorderThickness="1" CornerRadius="10" Margin="0,0,13,15" ClipToBounds="True">
            <StackPanel>
-            <Border Background="#252E30" Height="123" CornerRadius="9,9,0,0" ClipToBounds="True">
+            <Border Background="#242C37" Height="123" CornerRadius="9,9,0,0" ClipToBounds="True">
              <Grid>
               <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-               <TextBlock Text="{Binding Glyph}" FontSize="32" Foreground="#C8EF70" HorizontalAlignment="Center"/>
-               <TextBlock Text="{Binding Kind}" Foreground="#B9C8C1" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+               <TextBlock Text="{Binding Glyph}" FontSize="32" Foreground="#8CB8FF" HorizontalAlignment="Center"/>
+               <TextBlock Text="{Binding Kind}" Foreground="#ADB9C8" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4,0,0"/>
               </StackPanel>
               <Image Source="{Binding PreviewPath}" Stretch="UniformToFill"/>
              </Grid>
@@ -192,7 +263,7 @@
              <Grid>
               <Button Content="Open" Tag="{Binding}" Padding="10,6" FontSize="11" HorizontalAlignment="Left"/>
               <Button Content="Show in folder" Tag="{Binding}" Padding="6,6" FontSize="10" HorizontalAlignment="Right"
-                      BorderThickness="0" Background="Transparent" Foreground="#C8EF70"/>
+                      BorderThickness="0" Background="Transparent" Foreground="#8CB8FF"/>
              </Grid>
             </StackPanel>
            </StackPanel>
@@ -204,36 +275,71 @@
      </ScrollViewer>
     </Grid>
     <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-     <StackPanel>
-      <TextBlock Text="Settings" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,20"/>
-      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="11" Padding="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+     <StackPanel Margin="0,0,13,0">
+      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="20" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
-        <TextBlock Text="STARTUP &amp; NOTIFICATIONS" FontSize="10" Foreground="#C8EF70" FontWeight="SemiBold" Margin="0,0,0,12"/>
+        <TextBlock Text="Startup" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,8"/>
         <CheckBox x:Name="AutostartCheck" Content="Start SwooshDrop when I sign in to Windows"/>
         <CheckBox x:Name="ReceiveOnLaunchCheck" Content="Start receiving when SwooshDrop opens"/>
-        <CheckBox x:Name="NotificationsCheck" Content="Show photo and link previews in notifications"/>
-        <CheckBox x:Name="OpenLinksCheck" Content="Open accepted web links in my browser"/>
-        <TextBlock Text="Every transfer still needs your approval." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,10,0,0"/>
        </StackPanel>
       </Border>
-      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="11" Padding="22" Margin="0,16,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="20" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
-        <TextBlock Text="SAVE FILES TO" FontSize="10" Foreground="#C8EF70" FontWeight="SemiBold"/>
-        <TextBlock x:Name="SaveFolderText" FontSize="13" TextWrapping="Wrap" Margin="0,12,0,14"/>
-        <Button x:Name="ChangeFolderButton" Content="Choose folder…" HorizontalAlignment="Left"/>
-        <TextBlock Text="Changing folders takes effect after Stop → Start." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0"/>
-        <Button x:Name="SetupButton" Content="Adapter setup…" HorizontalAlignment="Left" Margin="0,16,0,0"/>
-        <TextBlock Text="Stops receiving and opens setup to change your USB adapter." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,9,0,0"/>
+        <TextBlock Text="Incoming transfers" FontSize="15" FontWeight="SemiBold"/>
+        <TextBlock Text="Choose how you approve files and links sent from your iPhone." FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,14" TextWrapping="Wrap"/>
+        <Grid>
+         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+         <RadioButton x:Name="WindowsNotificationRadio" GroupName="NotificationMode" Grid.Column="0">
+          <StackPanel><TextBlock Text="Windows notifications" FontWeight="SemiBold"/><TextBlock Text="Use the Windows notification center" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel>
+         </RadioButton>
+         <RadioButton x:Name="AppPopupRadio" GroupName="NotificationMode" Grid.Column="2">
+          <StackPanel><TextBlock Text="SwooshDrop popup" FontWeight="SemiBold"/><TextBlock Text="Approve in a matching app window" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel>
+         </RadioButton>
+        </Grid>
+        <CheckBox x:Name="OpenLinksCheck" Content="Open accepted web links in my browser" Margin="0,14,0,0"/>
+        <TextBlock Text="Every transfer still needs your approval." Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,9,0,0"/>
+       </StackPanel>
+      </Border>
+      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="20" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+       <StackPanel>
+        <TextBlock Text="Files &amp; adapter" FontSize="15" FontWeight="SemiBold"/>
+        <TextBlock Text="Save received files to" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
+        <TextBlock x:Name="SaveFolderText" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <StackPanel Orientation="Horizontal">
+         <Button x:Name="ChangeFolderButton" Content="Choose folder…"/>
+         <Button x:Name="SetupButton" Content="Adapter setup…" Margin="9,0,0,0"/>
+        </StackPanel>
+        <TextBlock Text="Folder changes take effect after stopping and starting receiving." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0"/>
+       </StackPanel>
+      </Border>
+      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="20" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+       <StackPanel>
+        <TextBlock Text="Diagnostics" FontSize="15" FontWeight="SemiBold"/>
+        <TextBlock Text="Live receiver events, useful when troubleshooting." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,13"/>
+        <Grid>
+         <ComboBox x:Name="LogSourceCombo" Width="135" Height="31" HorizontalAlignment="Left" VerticalAlignment="Center"
+                   Background="#28313D" Foreground="#F1F4F9" BorderBrush="#3B4655" SelectedIndex="0" FontSize="11">
+          <ComboBoxItem Content="Activity"/><ComboBoxItem Content="Radio"/><ComboBoxItem Content="Bridge"/>
+         </ComboBox>
+         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Button x:Name="CopyLogsButton" Content="Copy" Padding="11,6" FontSize="11"/>
+          <Button x:Name="OpenLogsButton" Content="Open logs ↗" Padding="11,6" FontSize="11" Margin="7,0,0,0"/>
+         </StackPanel>
+        </Grid>
+        <Border Background="#10161E" BorderBrush="#334153" BorderThickness="1" CornerRadius="8" Margin="0,10,0,0" Padding="9">
+         <TextBox x:Name="LogsTextBox" Text="Waiting for activity…" IsReadOnly="True" FontFamily="Consolas" FontSize="11" Foreground="#CED8E6"
+                  Background="Transparent" BorderThickness="0" CaretBrush="#8CB8FF" TextWrapping="NoWrap" AcceptsReturn="True"
+                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="168"/>
+        </Border>
        </StackPanel>
       </Border>
      </StackPanel>
     </ScrollViewer>
     <ScrollViewer x:Name="AboutPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
      <StackPanel>
-      <TextBlock Text="About SwooshDrop" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,20"/>
       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="11" Padding="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
-        <TextBlock Text="SwooshDrop 0.3.4 beta" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Text="SwooshDrop beta" FontSize="17" FontWeight="SemiBold"/>
         <TextBlock Text="Receive photos, files, and web links from the native AirDrop menu on your iPhone." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,10,0,16"/>
         <TextBlock Text="Unofficial community project" FontWeight="SemiBold" FontSize="13"/>
         <TextBlock Text="Developed independently by AlbinoPriest. Not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,7,0,14"/>
@@ -250,7 +356,7 @@
     </ScrollViewer>
    </Grid>
    <TextBlock Grid.Row="3" Text="Files keep their original quality. Closing this window keeps receiving in the tray."
-              FontSize="10" Foreground="#8B9B9C" Margin="0,15,0,0"/>
+              FontSize="10" Foreground="#8794A5" Margin="0,15,0,0"/>
   </Grid>
  </Grid>
 </Window>

@@ -8,6 +8,7 @@ using System.Drawing;
 using System.IO;
 using System.IO.Pipes;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -24,14 +26,15 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.4.0")]
-[assembly: AssemblyFileVersion("0.3.4.0")]
+[assembly: AssemblyVersion("0.3.5.0")]
+[assembly: AssemblyFileVersion("0.3.5.0")]
 
 public class Preferences
 {
     public string SaveFolder { get; set; }
     public bool ReceiveOnLaunch { get; set; }
     public bool Notifications { get; set; }
+    public string NotificationMode { get; set; }
     public bool OpenLinksOnReceive { get; set; }
     public string RuntimeDistro { get; set; }
     public string AdapterInstanceId { get; set; }
@@ -58,6 +61,8 @@ public class TransferItem : INotifyPropertyChanged
 
 public sealed class WinDropTray
 {
+    [DllImport("dwmapi.dll")]
+    static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
     const string PipeName = "WinDrop.PC.Activation.v2";
     readonly string exe = Assembly.GetExecutingAssembly().Location;
     readonly string data;
@@ -69,6 +74,8 @@ public sealed class WinDropTray
     readonly Forms.NotifyIcon tray = new Forms.NotifyIcon();
     readonly DispatcherTimer retry = new DispatcherTimer();
     readonly DispatcherTimer expiry = new DispatcherTimer();
+    readonly DispatcherTimer trayClickDelay = new DispatcherTimer();
+    readonly DispatcherTimer logRefresh = new DispatcherTimer();
     Preferences settings;
     Process receiver;
     string control, bus, token, sessionDevice;
@@ -77,12 +84,14 @@ public sealed class WinDropTray
     DateTime deadline;
     string incomingPreview, lastSender;
     Window popup;
+    Window flyout;
+    DateTime ignoreTrayClicksUntil;
 
     [STAThread]
     public static void Main(string[] args)
     {
         if (Array.IndexOf(args, "--toast-server") >= 0) { RunToastServer(); return; }
-        bool render = Array.IndexOf(args, "--render") >= 0 || Array.IndexOf(args, "--render-popup") >= 0;
+        bool render = Array.IndexOf(args, "--render") >= 0 || Array.IndexOf(args, "--render-popup") >= 0 || Array.IndexOf(args, "--render-flyout") >= 0;
         bool created;
         using (var mutex = new Mutex(true, render ? "Local\\WinDrop.PC.Render" : "Local\\WinDrop.PC.Instance", out created))
         {
@@ -92,13 +101,22 @@ public sealed class WinDropTray
             var app = new WinDropTray(dataOverride, render);
             if (render)
             {
-                if (Array.IndexOf(args, "--render-popup") >= 0)
+                if (Array.IndexOf(args, "--render-flyout") >= 0)
+                {
+                    app.OpenTrayFlyout(); app.Render(app.flyout, Option(args, "--render-flyout"));
+                }
+                else if (Array.IndexOf(args, "--render-popup") >= 0)
                 {
                     app.incoming = new Dictionary<string, object> { { "id", Guid.NewGuid().ToString("N") }, { "sender", "Your iPhone" }, { "files", new string[] { "Weekend photo.heic" } }, { "links", new string[0] } };
                     app.incomingPreview = Option(args, "--preview"); app.deadline = DateTime.UtcNow.AddSeconds(60);
                     app.OpenPopup(); app.Render(app.popup, Option(args, "--render-popup"));
                 }
-                else { app.window.Show(); app.Render(app.window, Option(args, "--render")); }
+                else
+                {
+                    string page = Option(args, "--render-page");
+                    if (page == "Received" || page == "Settings" || page == "About") app.Page(page);
+                    app.window.Show(); app.Render(app.window, Option(args, "--render"));
+                }
                 app.quitting = true; application.Shutdown(); return;
             }
             app.ExtractRuntime();
@@ -130,6 +148,17 @@ public sealed class WinDropTray
         runtime = Path.Combine(data, "Runtime"); Directory.CreateDirectory(data); Directory.CreateDirectory(Path.Combine(data, "Previews"));
         settings = Read<Preferences>("settings.json") ?? new Preferences();
         window = (Window)XamlReader.Parse(ResourceText("MainWindow.xaml"));
+        window.SourceInitialized += delegate
+        {
+            try
+            {
+                int enabled = 1;
+                IntPtr hwnd = new WindowInteropHelper(window).Handle;
+                if (DwmSetWindowAttribute(hwnd, 20, ref enabled, sizeof(int)) != 0)
+                    DwmSetWindowAttribute(hwnd, 19, ref enabled, sizeof(int));
+            }
+            catch (Exception ex) { Log("Dark title bar: " + ex.Message); }
+        };
         try { window.Icon = Bitmap(ResourceBytes("AppIcon.png")); } catch { }
         var saved = Read<List<TransferItem>>("history.json");
         if (saved != null) foreach (var item in saved) { if (items.Count >= 500) break; items.Add(item); }
@@ -155,7 +184,8 @@ public sealed class WinDropTray
         loadingSettings = true;
         Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled();
         Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked = settings.ReceiveOnLaunch;
-        Find<CheckBox>("NotificationsCheck").IsChecked = settings.Notifications;
+        Find<RadioButton>("WindowsNotificationRadio").IsChecked = NotificationMode == "windows";
+        Find<RadioButton>("AppPopupRadio").IsChecked = NotificationMode == "app";
         Find<CheckBox>("OpenLinksCheck").IsChecked = settings.OpenLinksOnReceive;
         Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder;
         loadingSettings = false;
@@ -166,13 +196,20 @@ public sealed class WinDropTray
             catch (Exception ex) { Log("Autostart: " + ex.Message); Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled(); MessageBox.Show("Windows could not save the startup setting.", "SwooshDrop"); }
         };
         Find<CheckBox>("ReceiveOnLaunchCheck").Click += delegate { settings.ReceiveOnLaunch = Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked == true; SaveSettings(); };
-        Find<CheckBox>("NotificationsCheck").Click += delegate { settings.Notifications = Find<CheckBox>("NotificationsCheck").IsChecked == true; SaveSettings(); };
+        Find<RadioButton>("WindowsNotificationRadio").Click += delegate { SetNotificationMode("windows"); };
+        Find<RadioButton>("AppPopupRadio").Click += delegate { SetNotificationMode("app"); };
         Find<CheckBox>("OpenLinksCheck").Click += delegate { settings.OpenLinksOnReceive = Find<CheckBox>("OpenLinksCheck").IsChecked == true; SaveSettings(); };
         Find<Button>("ChangeFolderButton").Click += delegate
         {
             using (var picker = new Forms.FolderBrowserDialog { Description = "Choose where SwooshDrop saves received files", SelectedPath = settings.SaveFolder })
                 if (picker.ShowDialog() == Forms.DialogResult.OK) { settings.SaveFolder = picker.SelectedPath; Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder; SaveSettings(); }
         };
+        Find<Button>("CopyLogsButton").Click += delegate { try { Clipboard.SetText(Find<TextBox>("LogsTextBox").Text ?? ""); } catch (Exception ex) { Log("Copy logs: " + ex.Message); } };
+        Find<Button>("OpenLogsButton").Click += delegate { string folder = Path.GetDirectoryName(SelectedLogPath()); Directory.CreateDirectory(folder); Process.Start("explorer.exe", Quote(folder)); };
+        Find<ComboBox>("LogSourceCombo").SelectionChanged += delegate { RefreshLogView(); };
+        logRefresh.Interval = TimeSpan.FromSeconds(2);
+        logRefresh.Tick += delegate { if (Find<UIElement>("SettingsPage").Visibility == Visibility.Visible) RefreshLogView(); };
+        if (!render) logRefresh.Start();
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
         {
@@ -183,7 +220,11 @@ public sealed class WinDropTray
             menu.Items.Add("Start receiving", null, async delegate { receivingIntent = true; await StartReceiving(); });
             menu.Items.Add("Stop receiving", null, async delegate { receivingIntent = false; await StopReceiving(); });
             menu.Items.Add("Quit", null, async delegate { if (busy) return; receivingIntent = false; await StopReceiving(); if (ownsSession) return; quitting = true; tray.Dispose(); Application.Current.Shutdown(); });
-            tray.ContextMenuStrip = menu; tray.DoubleClick += delegate { ShowWindow(); };
+            tray.ContextMenuStrip = menu;
+            trayClickDelay.Interval = TimeSpan.FromMilliseconds(240);
+            trayClickDelay.Tick += delegate { trayClickDelay.Stop(); ToggleTrayFlyout(); };
+            tray.MouseClick += delegate(object sender, Forms.MouseEventArgs e) { if (e.Button == Forms.MouseButtons.Left) OnUi(delegate { if (DateTime.UtcNow < ignoreTrayClicksUntil) return; trayClickDelay.Stop(); trayClickDelay.Start(); }); };
+            tray.MouseDoubleClick += delegate(object sender, Forms.MouseEventArgs e) { if (e.Button == Forms.MouseButtons.Left) OnUi(delegate { ignoreTrayClicksUntil = DateTime.UtcNow.AddMilliseconds(400); trayClickDelay.Stop(); HideTrayFlyout(); ShowWindow(); }); };
             retry.Interval = TimeSpan.FromSeconds(20); retry.Tick += async delegate { if (receivingIntent && !busy && !ownsSession) await StartReceiving(); }; retry.Start();
             expiry.Interval = TimeSpan.FromSeconds(1); expiry.Tick += delegate { if (incoming == null) return; int remaining = Math.Max(0, (int)(deadline - DateTime.UtcNow).TotalSeconds); if (popup != null) ((TextBlock)popup.FindName("CountdownText")).Text = remaining + "s"; if (remaining == 0) Decide(false); }; expiry.Start();
         }
@@ -194,24 +235,124 @@ public sealed class WinDropTray
         foreach (string page in new string[] { "Received", "Settings", "About" })
         {
             ((UIElement)window.FindName(page + "Page")).Visibility = page == name ? Visibility.Visible : Visibility.Collapsed;
-            Find<Button>(page + "Nav").Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#303B3A" : "#151A1E"));
+            Find<Button>(page + "Nav").Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#2B3645" : "#171C24"));
         }
+        var title = Find<TextBlock>("PageTitleText");
+        var subtitle = Find<TextBlock>("PageSubtitleText");
+        if (title != null) title.Text = name;
+        if (subtitle != null) subtitle.Text = name == "Received" ? "Your files and links from iPhone, in one place." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
+        if (name == "Settings") RefreshLogView();
     }
-    void ShowWindow() { window.Show(); window.WindowState = WindowState.Normal; window.Activate(); }
-    void OpenFolder() { Directory.CreateDirectory(settings.SaveFolder); Process.Start("explorer.exe", Quote(settings.SaveFolder)); }
-    void UpdateCount() { Find<TextBlock>("CountText").Text = items.Count + (items.Count == 1 ? " item" : " items"); Find<StackPanel>("EmptyState").Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; }
+    void ShowWindow() { HideTrayFlyout(); window.Show(); window.WindowState = WindowState.Normal; window.Activate(); }
+    void OpenFolder() { HideTrayFlyout(); Directory.CreateDirectory(settings.SaveFolder); Process.Start("explorer.exe", Quote(settings.SaveFolder)); }
+    T FindFlyout<T>(string name) where T : class { return flyout == null ? null : flyout.FindName(name) as T; }
+    void ToggleTrayFlyout()
+    {
+        try { if (flyout != null && flyout.IsVisible) HideTrayFlyout(); else OpenTrayFlyout(); }
+        catch (Exception ex) { Log("Tray flyout: " + ex.Message); ShowWindow(); }
+    }
+    void HideTrayFlyout() { if (flyout != null && flyout.IsVisible) flyout.Hide(); }
+    void OpenTrayFlyout()
+    {
+        if (flyout == null)
+        {
+            flyout = (Window)XamlReader.Parse(ResourceText("TrayFlyout.xaml"));
+            flyout.Deactivated += delegate { if (!rendering) HideTrayFlyout(); };
+            FindFlyout<Button>("FlyoutOpenButton").Click += delegate { ShowWindow(); };
+            FindFlyout<Button>("FlyoutFolderButton").Click += delegate { OpenFolder(); };
+            FindFlyout<Button>("FlyoutSettingsButton").Click += delegate { ShowWindow(); Page("Settings"); };
+            FindFlyout<Button>("FlyoutReceiveButton").Click += async delegate
+            {
+                if (busy) return;
+                if (ownsSession) { receivingIntent = false; await StopReceiving(); }
+                else { receivingIntent = true; await StartReceiving(); }
+            };
+            var close = FindFlyout<Button>("FlyoutCloseButton"); if (close != null) close.Click += delegate { HideTrayFlyout(); };
+        }
+        UpdateTrayFlyout();
+        flyout.Opacity = rendering ? 1 : 0;
+        flyout.Show();
+        if (!rendering)
+        {
+            var cursor = Forms.Cursor.Position;
+            var bounds = Forms.Screen.FromPoint(cursor).WorkingArea;
+            var source = PresentationSource.FromVisual(flyout);
+            if (source != null && source.CompositionTarget != null)
+            {
+                var scale = source.CompositionTarget.TransformFromDevice;
+                var point = scale.Transform(new System.Windows.Point(cursor.X, cursor.Y));
+                var topLeft = scale.Transform(new System.Windows.Point(bounds.Left, bounds.Top));
+                var bottomRight = scale.Transform(new System.Windows.Point(bounds.Right, bounds.Bottom));
+                double width = flyout.ActualWidth > 0 ? flyout.ActualWidth : flyout.Width;
+                double height = flyout.ActualHeight > 0 ? flyout.ActualHeight : flyout.Height;
+                double left = Math.Max(topLeft.X + 8, Math.Min(point.X - width + 20, bottomRight.X - width - 8));
+                double top = point.Y - height - 12;
+                if (top < topLeft.Y + 8) top = point.Y + 12;
+                top = Math.Max(topLeft.Y + 8, Math.Min(top, bottomRight.Y - height - 8));
+                flyout.Left = left; flyout.Top = top;
+            }
+        }
+        flyout.Opacity = 1;
+        flyout.Activate();
+    }
+    void UpdateTrayFlyout()
+    {
+        if (flyout == null) return;
+        var status = FindFlyout<TextBlock>("FlyoutStatusText"); if (status != null) status.Text = Find<TextBlock>("StatusText").Text;
+        var detail = FindFlyout<TextBlock>("FlyoutStatusDetail"); if (detail != null) detail.Text = Find<TextBlock>("StatusDetail").Text;
+        var last = FindFlyout<TextBlock>("FlyoutLastText"); if (last != null) last.Text = items.Count == 0 ? "No transfers yet" : items[0].Name + " · " + items[0].ReceivedAt.ToLocalTime().ToString("HH:mm");
+        var count = FindFlyout<TextBlock>("FlyoutCountText"); if (count != null) count.Text = items.Count + (items.Count == 1 ? " received item" : " received items");
+        var adapter = FindFlyout<TextBlock>("FlyoutAdapterText"); if (adapter != null) adapter.Text = ownsSession ? "Connected" : string.IsNullOrEmpty(settings.AdapterInstanceId) ? "Not selected" : "Released to Windows";
+        var runtimeStatus = FindFlyout<TextBlock>("FlyoutRuntimeText"); if (runtimeStatus != null) runtimeStatus.Text = busy ? ownsSession ? "Stopping…" : "Starting…" : ownsSession ? "WSL2 running" : "Stopped";
+        var dot = FindFlyout<System.Windows.Shapes.Ellipse>("FlyoutStatusDot"); if (dot != null) dot.Fill = Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill;
+        var toggle = FindFlyout<Button>("FlyoutReceiveButton"); if (toggle != null) { toggle.Content = busy ? "Working…" : ownsSession ? "Stop receiving" : "Start receiving"; toggle.IsEnabled = !busy; }
+    }
+    void UpdateCount() { Find<TextBlock>("CountText").Text = items.Count + (items.Count == 1 ? " item" : " items"); Find<StackPanel>("EmptyState").Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; UpdateTrayFlyout(); }
     void SetStatus(string title, string detail, bool ready)
     {
         Find<TextBlock>("StatusText").Text = title; Find<TextBlock>("StatusDetail").Text = detail;
-        Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#21AC83" : "#9AA8BE"));
+        Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#8CB8FF" : "#8794A5"));
         Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving";
         Find<Button>("ReceiveButton").IsEnabled = !busy;
         if (!rendering) tray.Text = "SwooshDrop · " + title.Substring(0, Math.Min(48, title.Length));
+        UpdateTrayFlyout();
     }
     void OnUi(Action action) { if (!quitting) window.Dispatcher.BeginInvoke(action); }
     void Log(string text)
     {
         try { string path = Path.Combine(data, "Logs", "app.log"); Directory.CreateDirectory(Path.GetDirectoryName(path)); if (File.Exists(path) && new FileInfo(path).Length > 2 * 1024 * 1024) File.WriteAllText(path, ""); File.AppendAllText(path, DateTime.Now.ToString("s") + " " + text + Environment.NewLine, Encoding.UTF8); } catch (IOException) { }
+    }
+    void RefreshLogView()
+    {
+        var box = Find<TextBox>("LogsTextBox"); if (box == null) return;
+        string path = SelectedLogPath();
+        try
+        {
+            if (!File.Exists(path)) { box.Text = "No events recorded yet."; return; }
+            string tail;
+            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                long start = Math.Max(0, file.Length - 48000); file.Seek(start, SeekOrigin.Begin);
+                using (var reader = new StreamReader(file, Encoding.UTF8, true)) tail = reader.ReadToEnd();
+                if (start > 0) { int newline = tail.IndexOf('\n'); if (newline >= 0) tail = tail.Substring(newline + 1); }
+            }
+            tail = tail.TrimEnd();
+            if (box.Text != tail)
+            {
+                bool follow = box.VerticalOffset >= box.ExtentHeight - box.ViewportHeight - 2;
+                double offset = box.VerticalOffset;
+                box.Text = tail;
+                if (follow) box.ScrollToEnd(); else box.ScrollToVerticalOffset(offset);
+            }
+        }
+        catch (IOException) { }
+    }
+    string SelectedLogPath()
+    {
+        var source = Find<ComboBox>("LogSourceCombo");
+        if (source != null && source.SelectedIndex == 1) return Path.Combine(runtime, "logs", "owl.log");
+        if (source != null && source.SelectedIndex == 2) return Path.Combine(runtime, "logs", "bridge.log");
+        return Path.Combine(data, "Logs", "app.log");
     }
     T Read<T>(string file) where T : class
     { try { string path = Path.Combine(data, file); if (File.Exists(path) && new FileInfo(path).Length < 2097152) return json.Deserialize<T>(File.ReadAllText(path)); } catch (Exception ex) { Log("Read " + file + ": " + ex.Message); } return null; }
@@ -222,6 +363,13 @@ public sealed class WinDropTray
         if (File.Exists(path)) File.Replace(temporary, path, null); else File.Move(temporary, path);
     }
     void SaveSettings() { try { Write("settings.json", settings); } catch (IOException ex) { Log(ex.Message); } }
+    string NotificationMode { get { return settings.NotificationMode == "app" || (string.IsNullOrEmpty(settings.NotificationMode) && !settings.Notifications) ? "app" : "windows"; } }
+    void SetNotificationMode(string mode)
+    {
+        settings.NotificationMode = mode;
+        settings.Notifications = mode == "windows"; // preserve the older setting for upgrades
+        SaveSettings();
+    }
     void SaveHistory() { try { Write("history.json", new List<TransferItem>(items)); } catch (IOException ex) { Log(ex.Message); } }
     void ImportFolder(string folder)
     {
@@ -330,7 +478,7 @@ public sealed class WinDropTray
             });
         }
         catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving", ex.Message.Contains("adapter-missing") ? "Plug in your selected USB adapter. SwooshDrop will try again." : "Open Settings → Adapter setup to check this PC, or About → Open diagnostics.", false); }
-        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; }
+        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; UpdateTrayFlyout(); }
         if (failed && ownsSession) await StopReceiving();
         if (receiver != null && receiver.HasExited && ownsSession) await StopReceiving();
     }
@@ -361,7 +509,7 @@ public sealed class WinDropTray
             SetStatus("Receiving is off", "Start receiving whenever you're ready.", false);
         }
         catch (Exception ex) { Log("Stop: " + ex.Message); SetStatus("Still stopping", "Please try Stop again.", false); }
-        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; }
+        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; UpdateTrayFlyout(); }
     }
 
     void HandleLine(string line)
@@ -398,7 +546,8 @@ public sealed class WinDropTray
     void OpenPopup()
     {
         if (incoming == null || popup != null) return;
-        popup = (Window)XamlReader.Parse(ResourceText("TransferPopup.xaml")); popup.Resources = window.Resources;
+        popup = (Window)XamlReader.Parse(ResourceText("TransferPopup.xaml"));
+        popup.Closed += delegate(object sender, EventArgs e) { if (ReferenceEquals(popup, sender)) popup = null; if (incoming != null) Decide(false); };
         ((TextBlock)popup.FindName("SenderText")).Text = Convert.ToString(incoming["sender"]) + " wants to share";
         string[] links = Strings(incoming, "links"), files = Strings(incoming, "files");
         ((TextBlock)popup.FindName("FilesText")).Text = links.Length > 0 ? (links.Length == 1 ? "Web link" : links.Length + " web links") : string.Join(", ", files);
@@ -406,8 +555,24 @@ public sealed class WinDropTray
         if (links.Length > 0) { var link = (TextBox)popup.FindName("LinkText"); link.Text = string.Join("\n\n", links); link.Visibility = Visibility.Visible; ((TextBlock)popup.FindName("PreviewGlyph")).Visibility = Visibility.Collapsed; }
         ((Button)popup.FindName("AcceptButton")).Click += delegate { Decide(true); };
         ((Button)popup.FindName("DeclineButton")).Click += delegate { Decide(false); };
-        Rect area = SystemParameters.WorkArea; popup.Left = area.Right - popup.Width - 22; popup.Top = area.Bottom - popup.Height - 20;
+        popup.Opacity = rendering ? 1 : 0;
         popup.Show();
+        if (!rendering)
+        {
+            var bounds = Forms.Screen.FromPoint(Forms.Cursor.Position).WorkingArea;
+            var source = PresentationSource.FromVisual(popup);
+            if (source != null && source.CompositionTarget != null)
+            {
+                var scale = source.CompositionTarget.TransformFromDevice;
+                var topLeft = scale.Transform(new System.Windows.Point(bounds.Left, bounds.Top));
+                var bottomRight = scale.Transform(new System.Windows.Point(bounds.Right, bounds.Bottom));
+                popup.Left = bottomRight.X - popup.Width - 18;
+                popup.Top = bottomRight.Y - popup.Height - 18;
+                popup.Left = Math.Max(topLeft.X + 8, popup.Left);
+                popup.Top = Math.Max(topLeft.Y + 8, popup.Top);
+            }
+        }
+        popup.Opacity = 1;
     }
     void Decide(bool accepted)
     {
@@ -495,7 +660,7 @@ public sealed class WinDropTray
     async void Notify(string title, string body, string image, string id, Func<bool, Task> callback)
     {
         bool shown = false;
-        if (settings.Notifications)
+        if (NotificationMode == "windows")
             shown = await Task.Run(delegate
             {
                 string request = Path.Combine(data, "toast-" + Guid.NewGuid().ToString("N") + ".json");
@@ -504,7 +669,7 @@ public sealed class WinDropTray
                 finally { try { File.Delete(request); } catch (IOException) { } }
             });
         if (callback != null) await callback(shown);
-        else if (!shown && settings.Notifications) tray.ShowBalloonTip(5000, title, body.Length > 200 ? body.Substring(0, 200) : body, Forms.ToolTipIcon.Info);
+        else if (!shown && NotificationMode == "windows") tray.ShowBalloonTip(5000, title, body.Length > 200 ? body.Substring(0, 200) : body, Forms.ToolTipIcon.Info);
     }
     void Activate(string activation)
     {

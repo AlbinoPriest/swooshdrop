@@ -31,6 +31,7 @@ foreach ($file in @('windrop.dll','windrop.deps.json','windrop.runtimeconfig.jso
 }
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'ui\MainWindow.xaml') + ',UI.MainWindow.xaml'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'ui\TransferPopup.xaml') + ',UI.TransferPopup.xaml'
+$arguments += '/resource:' + (Join-Path $PSScriptRoot 'ui\TrayFlyout.xaml') + ',UI.TrayFlyout.xaml'
 $arguments += '/resource:' + $iconPng + ',UI.AppIcon.png'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'LICENSE') + ',Notices.App-LICENSE.txt'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'licenses\WinDrop-LICENSE.txt') + ',Notices.Protocol-LICENSE.txt'
