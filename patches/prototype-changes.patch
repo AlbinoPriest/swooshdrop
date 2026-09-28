@@ -1,16 +1,19 @@
 diff --git a/src/WinDrop.Cli/Program.cs b/src/WinDrop.Cli/Program.cs
-index b749151..05f7461 100644
+index b749151..eed26bc 100644
 --- a/src/WinDrop.Cli/Program.cs
 +++ b/src/WinDrop.Cli/Program.cs
-@@ -1,4 +1,7 @@
+@@ -1,6 +1,10 @@
  using System.Globalization;
 +using System.Text.Json;
-+using System.Threading.Channels;
++using System.Collections.Concurrent;
 +using System.Diagnostics;
  using System.Net;
  using System.Security.Cryptography.X509Certificates;
++using WinDrop.Cli;
  using WinDrop.Protocol;
-@@ -45,7 +48,7 @@ static int PrintUsage()
+ using WinDrop.Protocol.Discovery;
+ using WinDrop.Protocol.Tls;
+@@ -45,7 +49,7 @@ static int PrintUsage()
      Console.WriteLine("""
          WinDrop - an AirDrop implementation for Windows
  
@@ -19,7 +22,7 @@ index b749151..05f7461 100644
            windrop send [--to <name>| --peer <host>] [--icon <image>] <file> [file...]
            windrop browse                   list nearby peers
  
-@@ -64,16 +67,19 @@ static int PrintUsage()
+@@ -64,16 +68,19 @@ static int PrintUsage()
  
  static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
  {
@@ -40,7 +43,7 @@ index b749151..05f7461 100644
  
      if (ArgumentValue(args, "--flags") is { } flagText)
      {
-@@ -101,14 +107,15 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+@@ -101,14 +108,15 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
  
      var receiver = new AirDropReceiver(new AirDropReceiverOptions
      {
@@ -61,7 +64,7 @@ index b749151..05f7461 100644
      });
  
      await using IAirDropTransport transport = CreateTransport(args);
-@@ -117,19 +124,21 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+@@ -117,45 +125,46 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
      // 8770. The SRV record carries the port, so browsers find it wherever it listens.
      int port = int.TryParse(ArgumentValue(args, "--port"), out int requested) ? requested : AirDropServiceRecord.DefaultPort;
  
@@ -84,28 +87,55 @@ index b749151..05f7461 100644
 -    using X509Certificate2 certificate = AirDropCertificate.CreateSelfSigned(Environment.MachineName);
 +    using X509Certificate2 certificate = AirDropCertificate.CreateSelfSigned(computerName);
  
-     await foreach (Stream raw in transport.AcceptAsync(record.Port, ct))
-     {
-@@ -140,7 +149,7 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
-             await using var ssl = await AirDropTls.AuthenticateAsServerAsync(raw, certificate, ct);
-             AirDropTransferResult? result = await receiver.HandleConnectionAsync(ssl, ct);
+-    await foreach (Stream raw in transport.AcceptAsync(record.Port, ct))
+-    {
+-        // One connection at a time is deliberate: a consent prompt on the console cannot
+-        // sensibly be answered for two senders at once.
+-        try
++    await ConcurrentReceiver.RunAsync(
++        transport.AcceptAsync(record.Port, ct),
++        async (raw, token) =>
+         {
+-            await using var ssl = await AirDropTls.AuthenticateAsServerAsync(raw, certificate, ct);
+-            AirDropTransferResult? result = await receiver.HandleConnectionAsync(ssl, ct);
++            try
++            {
++                await using var ssl = await AirDropTls.AuthenticateAsServerAsync(raw, certificate, token);
++                AirDropTransferResult? result = await receiver.HandleConnectionAsync(ssl, token);
  
 -            if (result is not null)
-+            if (result is not null && !uiEvents)
++                if (result is not null && !uiEvents)
++                {
++                    Console.WriteLine($"Received {result.Files.Count} file(s), {result.TotalBytes:N0} bytes:");
++                    foreach (string file in result.Files) Console.WriteLine($"  {file}");
++                    Console.WriteLine();
++                }
++            }
++            catch (Exception ex) when (ex is not OperationCanceledException)
              {
-                 Console.WriteLine($"Received {result.Files.Count} file(s), {result.TotalBytes:N0} bytes:");
-                 foreach (string file in result.Files) Console.WriteLine($"  {file}");
-@@ -149,7 +158,8 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
-         }
-         catch (Exception ex) when (ex is not OperationCanceledException)
-         {
+-                Console.WriteLine($"Received {result.Files.Count} file(s), {result.TotalBytes:N0} bytes:");
+-                foreach (string file in result.Files) Console.WriteLine($"  {file}");
+-                Console.WriteLine();
++                if (uiEvents) EmitUi(new { kind = "log", message = $"Connection failed: {ex.Message}" });
++                else Console.Error.WriteLine($"Connection failed: {ex.Message}");
+             }
+-        }
+-        catch (Exception ex) when (ex is not OperationCanceledException)
+-        {
 -            Console.Error.WriteLine($"Connection failed: {ex.Message}");
-+            if (uiEvents) EmitUi(new { kind = "log", message = $"Connection failed: {ex.Message}" });
-+            else Console.Error.WriteLine($"Connection failed: {ex.Message}");
-         }
-         finally
-         {
-@@ -177,8 +187,67 @@ static Task<bool> AutoAcceptAsync(AirDropAskRequest request, CancellationToken c
+-        }
+-        finally
+-        {
+-            await raw.DisposeAsync();
+-        }
+-    }
++        },
++        maxConcurrent: uiEvents || autoAccept ? 8 : 1,
++        ct);
+ 
+     return 0;
+ }
+@@ -177,8 +186,56 @@ static Task<bool> AutoAcceptAsync(AirDropAskRequest request, CancellationToken c
      return Task.FromResult(true);
  }
  
@@ -118,27 +148,16 @@ index b749151..05f7461 100644
 +{
 +    string id = Guid.NewGuid().ToString("N");
 +    string? preview = await DecodePreviewAsync(request.FileIcon, decoder, ct);
++    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
++    deadline.CancelAfter(TimeSpan.FromSeconds(60));
++    // Register before the event is emitted: a fast click must not be lost, and a
++    // second concurrent transfer must not consume this transfer's decision.
++    Task<bool> decision = UiInput.WaitForDecisionAsync(id, deadline.Token);
 +    EmitUi(new { kind = "consent", id, sender = request.SenderComputerName,
 +        files = request.Files.Select(f => f.FileName).ToArray(), links = request.Items,
 +        preview, converted = request.ConvertMediaFormats });
-+    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-+    deadline.CancelAfter(TimeSpan.FromSeconds(60));
-+    try
-+    {
-+        while (await UiInput.ReadLineAsync(deadline.Token) is { } line)
-+        {
-+            try
-+            {
-+                using var json = JsonDocument.Parse(line);
-+                var root = json.RootElement;
-+                if (root.GetProperty("id").GetString() == id)
-+                    return root.GetProperty("accept").GetBoolean();
-+            }
-+            catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException) { }
-+        }
-+    }
-+    catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
-+    return false;
++    try { return await decision; }
++    catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return false; }
 +}
 +
 +static async Task<string?> DecodePreviewAsync(byte[]? icon, string? decoder, CancellationToken ct)
@@ -173,33 +192,47 @@ index b749151..05f7461 100644
      // Only the size and the signature. Decoding it would mean pointing an image codec at
      // a stranger's bytes from a console tool that has nothing to show them on.
      if (request.FileIcon is { } icon)
-@@ -441,3 +510,28 @@ static string? ArgumentValue(string[] args, string name)
+@@ -441,3 +498,42 @@ static string? ArgumentValue(string[] args, string name)
      int index = Array.FindIndex(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
      return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
  }
 +
-+// Console.ReadLine can block despite its async-looking wrapper. One reader pump
-+// owns stdin; cancelling a consent wait must not leave another reader consuming
-+// the next transfer's decision. IDs reject late answers after timeout.
++// A single stdin pump routes each response to its transfer ID. Concurrent /Ask
++// sessions must not steal each other's Accept/Decline responses.
 +static class UiInput
 +{
-+    private static readonly Channel<string> Lines = Channel.CreateBounded<string>(new BoundedChannelOptions(32)
-+    { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.DropOldest });
++    private static readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> Pending = new();
 +
 +    static UiInput()
 +    {
 +        _ = Task.Run(() =>
 +        {
-+            try { while (Console.ReadLine() is { } line) Lines.Writer.TryWrite(line); }
-+            finally { Lines.Writer.TryComplete(); }
++            try
++            {
++                while (Console.ReadLine() is { } line)
++                {
++                    try
++                    {
++                        using var json = JsonDocument.Parse(line);
++                        var root = json.RootElement;
++                        string? id = root.GetProperty("id").GetString();
++                        bool accepted = root.GetProperty("accept").GetBoolean();
++                        if (id is not null && Pending.TryGetValue(id, out var waiter))
++                            waiter.TrySetResult(accepted);
++                    }
++                    catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException) { }
++                }
++            }
++            finally { foreach (var waiter in Pending.Values) waiter.TrySetResult(false); }
 +        });
 +    }
 +
-+    public static async ValueTask<string?> ReadLineAsync(CancellationToken ct)
++    public static async Task<bool> WaitForDecisionAsync(string id, CancellationToken ct)
 +    {
-+        while (await Lines.Reader.WaitToReadAsync(ct))
-+            if (Lines.Reader.TryRead(out string? line)) return line;
-+        return null;
++        var waiter = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
++        if (!Pending.TryAdd(id, waiter)) throw new InvalidOperationException("Duplicate transfer ID.");
++        try { return await waiter.Task.WaitAsync(ct); }
++        finally { Pending.TryRemove(id, out _); }
 +    }
 +}
 diff --git a/src/WinDrop.Protocol/AirDropMessages.cs b/src/WinDrop.Protocol/AirDropMessages.cs
@@ -608,10 +641,18 @@ index 0000000..18fee14
 +    }
 +}
 diff --git a/tools/windrop-bridge.py b/tools/windrop-bridge.py
-index 0da76f2..3fca6c8 100644
+index 0da76f2..03f2dd9 100644
 --- a/tools/windrop-bridge.py
 +++ b/tools/windrop-bridge.py
-@@ -71,11 +71,12 @@ def link_local_address(interface):
+@@ -34,6 +34,7 @@ Data connections carry one JSON line then raw bytes:
+ import argparse
+ import base64
+ import json
++import itertools
+ import logging
+ import socket
+ import struct
+@@ -71,11 +72,12 @@ def link_local_address(interface):
  
  
  class Bridge:
@@ -625,7 +666,15 @@ index 0da76f2..3fca6c8 100644
  
          self.index = socket.if_nametoindex(interface)
          self.address = link_local_address(interface)
-@@ -106,7 +107,7 @@ class Bridge:
+@@ -90,6 +92,7 @@ class Bridge:
+         self.control_lock = threading.Lock()
+         self.reverse_port = None
+         self.windows_host = None
++        self.relay_numbers = itertools.count(1)
+ 
+     # ---- control ---------------------------------------------------------
+ 
+@@ -106,7 +109,7 @@ class Bridge:
          listener = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
          listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
          listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -634,7 +683,7 @@ index 0da76f2..3fca6c8 100644
          listener.listen(4)
  
          log.info("control listening on %d", self.control_port)
-@@ -183,6 +184,9 @@ class Bridge:
+@@ -183,6 +186,9 @@ class Bridge:
          group = socket.inet_pton(socket.AF_INET6, MDNS_GROUP) + struct.pack("I", self.index)
          sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, group)
          sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, struct.pack("I", self.index))
@@ -644,7 +693,7 @@ index 0da76f2..3fca6c8 100644
          return sock
  
      def send_mdns(self, payload):
-@@ -192,7 +196,6 @@ class Bridge:
+@@ -192,7 +198,6 @@ class Bridge:
              log.warning("could not send mDNS: %s", error)
  
      def serve_mdns(self):
@@ -652,7 +701,69 @@ index 0da76f2..3fca6c8 100644
          log.info("mDNS relay joined %s on %s", MDNS_GROUP, self.interface)
  
          while True:
-@@ -239,7 +242,7 @@ class Bridge:
+@@ -209,37 +214,49 @@ class Bridge:
+ 
+     # ---- TCP relay -------------------------------------------------------
+ 
+-    @staticmethod
+-    def pipe(source, sink):
+-        try:
+-            while True:
+-                chunk = source.recv(65536)
+-                if not chunk:
+-                    break
+-                sink.sendall(chunk)
+-        except OSError:
+-            pass
+-        finally:
+-            for sock in (source, sink):
+-                try:
+-                    sock.shutdown(socket.SHUT_RDWR)
+-                except OSError:
+-                    pass
++    def couple(self, a, b, label="relay"):
++        relay_id = next(self.relay_numbers)
++        lock = threading.Lock()
++        remaining = 2
++        log.info("relay %d started (%s)", relay_id, label)
++
++        def pipe(source, sink, direction):
++            nonlocal remaining
++            transferred = 0
++            outcome = "eof"
++            try:
++                while True:
++                    chunk = source.recv(65536)
++                    if not chunk:
++                        break
++                    sink.sendall(chunk)
++                    transferred += len(chunk)
++            except OSError as error:
++                outcome = f"socket error {error.errno}"
++            finally:
++                # A peer can finish writing a request while it is still waiting for
++                # the response. Preserve the other direction until it also ends.
+                 try:
+-                    sock.close()
++                    sink.shutdown(socket.SHUT_WR)
+                 except OSError:
+                     pass
++                with lock:
++                    remaining -= 1
++                    close_pair = remaining == 0
++                log.info("relay %d %s ended: %d bytes, %s", relay_id, direction, transferred, outcome)
++                if close_pair:
++                    a.close()
++                    b.close()
+ 
+-    def couple(self, a, b):
+-        threading.Thread(target=self.pipe, args=(a, b), daemon=True).start()
+-        threading.Thread(target=self.pipe, args=(b, a), daemon=True).start()
++        threading.Thread(target=pipe, args=(a, b, "peer-to-controller"), daemon=True).start()
++        threading.Thread(target=pipe, args=(b, a, "controller-to-peer"), daemon=True).start()
+ 
+     def serve_data(self):
+         """Outbound: Windows asks us to dial a peer on the AWDL link."""
          listener = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
          listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
          listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -661,7 +772,25 @@ index 0da76f2..3fca6c8 100644
          listener.listen(8)
  
          log.info("data listening on %d", self.data_port)
-@@ -325,6 +328,7 @@ class Bridge:
+@@ -280,7 +297,7 @@ class Bridge:
+ 
+             conn.sendall(b'{"ok":true}\n')
+             log.info("relaying to [%s]:%d", address, port)
+-            self.couple(conn, peer)
++            self.couple(conn, peer, f"outbound {address}:{port}")
+ 
+         except Exception as error:  # noqa: BLE001 - report anything back to the caller
+             log.warning("outbound relay failed: %s", error)
+@@ -315,7 +332,7 @@ class Bridge:
+             windows.sendall((json.dumps({"peer": peer[0]}) + "\n").encode())
+ 
+             log.info("inbound from %s handed to controller", peer[0])
+-            self.couple(conn, windows)
++            self.couple(conn, windows, f"inbound {peer[0]}")
+ 
+         except OSError as error:
+             log.warning("could not hand inbound connection to controller: %s", error)
+@@ -325,6 +342,7 @@ class Bridge:
  
      def run(self):
          log.info("bridge on %s (index %d), address %s", self.interface, self.index, self.address)
@@ -669,7 +798,7 @@ index 0da76f2..3fca6c8 100644
  
          for target in (self.serve_mdns, self.serve_data, self.serve_airdrop):
              threading.Thread(target=target, daemon=True).start()
-@@ -339,6 +343,8 @@ def main():
+@@ -339,6 +357,8 @@ def main():
      parser.add_argument("--control-port", type=int, default=7788)
      parser.add_argument("--data-port", type=int, default=7789)
      parser.add_argument("--airdrop-port", type=int, default=AIRDROP_PORT)
@@ -678,7 +807,7 @@ index 0da76f2..3fca6c8 100644
      parser.add_argument("-v", "--verbose", action="store_true")
  
      args = parser.parse_args()
-@@ -348,7 +354,7 @@ def main():
+@@ -348,7 +368,7 @@ def main():
          format="%(asctime)s %(levelname)-7s %(message)s",
      )
  
@@ -687,3 +816,252 @@ index 0da76f2..3fca6c8 100644
  
      try:
          bridge.run()
+diff --git a/src/WinDrop.Cli/ConcurrentReceiver.cs b/src/WinDrop.Cli/ConcurrentReceiver.cs
+new file mode 100644
+index 0000000..c64e340
+--- /dev/null
++++ b/src/WinDrop.Cli/ConcurrentReceiver.cs
+@@ -0,0 +1,63 @@
++namespace WinDrop.Cli;
++
++/// <summary>
++/// Handles independent AirDrop TLS sessions concurrently. iOS can open /Ask while an
++/// earlier /Discover connection is still idle; serial handling makes that /Ask time out.
++/// </summary>
++internal static class ConcurrentReceiver
++{
++    public static async Task RunAsync(
++        IAsyncEnumerable<Stream> connections,
++        Func<Stream, CancellationToken, Task> handle,
++        int maxConcurrent,
++        CancellationToken ct)
++    {
++        if (maxConcurrent < 1) throw new ArgumentOutOfRangeException(nameof(maxConcurrent));
++
++        using var slots = new SemaphoreSlim(maxConcurrent);
++        var inFlight = new HashSet<Task>();
++
++        try
++        {
++            await foreach (Stream raw in connections.WithCancellation(ct))
++            {
++                try
++                {
++                    // Observe completed workers before forgetting them. A long-lived
++                    // receiver cannot retain every finished session indefinitely.
++                    foreach (Task completed in inFlight.Where(static task => task.IsCompleted).ToArray())
++                    {
++                        inFlight.Remove(completed);
++                        await completed;
++                    }
++
++                    await slots.WaitAsync(ct);
++                }
++                catch
++                {
++                    await raw.DisposeAsync();
++                    throw;
++                }
++
++                // Async work begins immediately. A held-open /Discover no longer blocks
++                // the next connection's TLS handshake or /Ask request.
++                Task worker = HandleOneAsync(raw);
++                inFlight.Add(worker);
++            }
++        }
++        finally
++        {
++            await Task.WhenAll(inFlight);
++        }
++
++        async Task HandleOneAsync(Stream raw)
++        {
++            try { await handle(raw, ct); }
++            finally
++            {
++                await raw.DisposeAsync();
++                slots.Release();
++            }
++        }
++    }
++}
+diff --git a/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj b/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj
+index feac118..a5f4822 100644
+--- a/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj
++++ b/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj
+@@ -22,6 +22,7 @@
+ 
+   <ItemGroup>
+     <ProjectReference Include="..\..\src\WinDrop.Protocol\WinDrop.Protocol.csproj" />
++    <Compile Include="..\..\src\WinDrop.Cli\ConcurrentReceiver.cs" Link="ConcurrentReceiver.cs" />
+   </ItemGroup>
+ 
+   <ItemGroup>
+diff --git a/tests/WinDrop.Protocol.Tests/ConcurrentReceiverTests.cs b/tests/WinDrop.Protocol.Tests/ConcurrentReceiverTests.cs
+new file mode 100644
+index 0000000..e0b64a1
+--- /dev/null
++++ b/tests/WinDrop.Protocol.Tests/ConcurrentReceiverTests.cs
+@@ -0,0 +1,111 @@
++using System.Threading.Channels;
++using WinDrop.Cli;
++
++namespace WinDrop.Protocol.Tests;
++
++public class ConcurrentReceiverTests
++{
++    [Fact]
++    public async Task Ask_is_handled_while_earlier_discover_connection_remains_open()
++    {
++        var accepted = Channel.CreateUnbounded<Stream>();
++        var discoverStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        var askStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        var releaseDiscover = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(5));
++
++        Task run = ConcurrentReceiver.RunAsync(accepted.Reader.ReadAllAsync(cancel.Token), async (stream, ct) =>
++        {
++            if (stream is TaggedStream { Tag: "discover" })
++            {
++                discoverStarted.SetResult();
++                await releaseDiscover.Task.WaitAsync(ct);
++            }
++            else askStarted.SetResult();
++        }, maxConcurrent: 2, cancel.Token);
++
++        var discover = new TaggedStream("discover");
++        var ask = new TaggedStream("ask");
++        await accepted.Writer.WriteAsync(discover, cancel.Token);
++        await discoverStarted.Task.WaitAsync(cancel.Token);
++        await accepted.Writer.WriteAsync(ask, cancel.Token);
++
++        // This is the regression: the old serial loop waited for Discover to close.
++        await askStarted.Task.WaitAsync(cancel.Token);
++        Assert.False(releaseDiscover.Task.IsCompleted);
++
++        releaseDiscover.SetResult();
++        accepted.Writer.Complete();
++        await run.WaitAsync(cancel.Token);
++        Assert.True(discover.WasDisposed);
++        Assert.True(ask.WasDisposed);
++    }
++
++    [Fact]
++    public async Task Concurrent_limit_holds_extra_connections_until_a_slot_is_free()
++    {
++        var accepted = Channel.CreateUnbounded<Stream>();
++        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(5));
++
++        Task run = ConcurrentReceiver.RunAsync(accepted.Reader.ReadAllAsync(cancel.Token), async (stream, ct) =>
++        {
++            if (stream is TaggedStream { Tag: "first" })
++            {
++                firstStarted.SetResult();
++                await releaseFirst.Task.WaitAsync(ct);
++            }
++            else secondStarted.SetResult();
++        }, maxConcurrent: 1, cancel.Token);
++
++        await accepted.Writer.WriteAsync(new TaggedStream("first"), cancel.Token);
++        await firstStarted.Task.WaitAsync(cancel.Token);
++        await accepted.Writer.WriteAsync(new TaggedStream("second"), cancel.Token);
++        await Task.Delay(50, cancel.Token);
++        Assert.False(secondStarted.Task.IsCompleted);
++
++        releaseFirst.SetResult();
++        await secondStarted.Task.WaitAsync(cancel.Token);
++        accepted.Writer.Complete();
++        await run.WaitAsync(cancel.Token);
++    }
++
++    [Fact]
++    public async Task Cancellation_disposes_active_and_waiting_connections()
++    {
++        var accepted = Channel.CreateUnbounded<Stream>();
++        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
++        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(5));
++
++        Task run = ConcurrentReceiver.RunAsync(accepted.Reader.ReadAllAsync(cancel.Token), async (_, ct) =>
++        {
++            firstStarted.SetResult();
++            await Task.Delay(Timeout.Infinite, ct);
++        }, maxConcurrent: 1, cancel.Token);
++
++        var first = new TaggedStream("first");
++        var waiting = new TaggedStream("waiting");
++        await accepted.Writer.WriteAsync(first);
++        await firstStarted.Task.WaitAsync(cancel.Token);
++        await accepted.Writer.WriteAsync(waiting);
++        await Task.Delay(50);
++        await cancel.CancelAsync();
++
++        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
++        Assert.True(first.WasDisposed);
++        Assert.True(waiting.WasDisposed);
++    }
++
++    private sealed class TaggedStream(string tag) : MemoryStream
++    {
++        public string Tag { get; } = tag;
++        public bool WasDisposed { get; private set; }
++        public override ValueTask DisposeAsync()
++        {
++            WasDisposed = true;
++            return base.DisposeAsync();
++        }
++    }
++}
+diff --git a/tests/test_bridge_relay.py b/tests/test_bridge_relay.py
+new file mode 100644
+index 0000000..49c914d
+--- /dev/null
++++ b/tests/test_bridge_relay.py
+@@ -0,0 +1,45 @@
++"""Regression tests for the AirDrop bridge's bidirectional TCP relay."""
++
++import importlib.util
++import pathlib
++import socket
++import unittest
++
++
++MODULE = pathlib.Path(__file__).resolve().parents[1] / "tools" / "windrop-bridge.py"
++spec = importlib.util.spec_from_file_location("windrop_bridge", MODULE)
++bridge = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(bridge)
++
++
++class RelayTests(unittest.TestCase):
++    def test_peer_half_close_keeps_reverse_response_open(self):
++        peer, peer_bridge = socket.socketpair()
++        controller_bridge, controller = socket.socketpair()
++        sockets = (peer, peer_bridge, controller_bridge, controller)
++        for sock in sockets:
++            sock.settimeout(2)
++
++        try:
++            # The relay method only needs its sequence counter; no radio is involved.
++            relay = bridge.Bridge.__new__(bridge.Bridge)
++            relay.relay_numbers = iter(range(1, 100))
++            relay.couple(peer_bridge, controller_bridge, "test")
++
++            peer.sendall(b"ask")
++            peer.shutdown(socket.SHUT_WR)
++            self.assertEqual(controller.recv(3), b"ask")
++            self.assertEqual(controller.recv(1), b"")
++
++            # The old bridge closed both sockets at the first EOF, losing this reply.
++            controller.sendall(b"accepted")
++            controller.shutdown(socket.SHUT_WR)
++            self.assertEqual(peer.recv(8), b"accepted")
++            self.assertEqual(peer.recv(1), b"")
++        finally:
++            for sock in sockets:
++                sock.close()
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -24,8 +24,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.3.0")]
-[assembly: AssemblyFileVersion("0.3.3.0")]
+[assembly: AssemblyVersion("0.3.4.0")]
+[assembly: AssemblyFileVersion("0.3.4.0")]
 
 public class Preferences
 {
@@ -194,7 +194,7 @@ public sealed class WinDropTray
         foreach (string page in new string[] { "Received", "Settings", "About" })
         {
             ((UIElement)window.FindName(page + "Page")).Visibility = page == name ? Visibility.Visible : Visibility.Collapsed;
-            Find<Button>(page + "Nav").Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#263957" : "#14213A"));
+            Find<Button>(page + "Nav").Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#303B3A" : "#151A1E"));
         }
     }
     void ShowWindow() { window.Show(); window.WindowState = WindowState.Normal; window.Activate(); }
@@ -348,6 +348,14 @@ public sealed class WinDropTray
                 foreach (Dictionary<string, object> device in (IEnumerable)state["Devices"]) if (string.Equals(Convert.ToString(device["InstanceId"]), sessionDevice, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Convert.ToString(device["ClientIPAddress"]))) Run(usb, "detach", "--busid", Convert.ToString(device["BusId"]));
                 var identity = AdapterIdentity.Parse(sessionDevice);
                 Wsl("bash", control, "release", identity.Vendor, identity.Product, identity.Serial);
+                // The managed runtime has no work after the radio is detached.
+                // Ending only this distro releases its idle services and cache;
+                // other WSL distributions (including Docker) stay running.
+                if (string.Equals(settings.RuntimeDistro, "WinDropRuntime", StringComparison.OrdinalIgnoreCase))
+                {
+                    try { Run("wsl.exe", "--terminate", settings.RuntimeDistro); }
+                    catch (Exception ex) { Log("Runtime idle shutdown: " + ex.Message); }
+                }
             });
             ownsSession = false; if (receiver != null) { receiver.Dispose(); receiver = null; }
             SetStatus("Receiving is off", "Start receiving whenever you're ready.", false);

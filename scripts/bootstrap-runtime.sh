@@ -15,4 +15,16 @@ ldd /opt/airdrop-lab/owl/build/daemon/owl | tee /tmp/windrop-link-check.txt
 ! grep -q 'not found' /tmp/windrop-link-check.txt
 dotnet --list-runtimes | grep -q 'Microsoft.NETCore.App 8\.'
 python3 -c 'from PIL import Image; assert Image.new("RGB", (1,1)).size == (1,1)'
+# The imported Ubuntu image enables a bridge to the optional Windows Ubuntu Pro
+# agent. This app-owned distro does not use it; without that agent the service
+# retries indefinitely and fills the system journal.
+if [[ -d /run/systemd/system ]]; then
+    if systemctl cat wsl-pro.service >/dev/null 2>&1; then
+        systemctl disable --now wsl-pro.service
+    fi
+    mkdir -p /etc/systemd/journald.conf.d
+    printf '[Journal]\nSystemMaxUse=64M\nRuntimeMaxUse=32M\n' > /etc/systemd/journald.conf.d/swooshdrop.conf
+    systemctl restart systemd-journald.service
+    journalctl --vacuum-size=64M
+fi
 echo 'SwooshDrop runtime ready.'
