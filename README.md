@@ -4,7 +4,7 @@ Receive photos, files, and web links from your iPhone's native **Share → AirDr
 
 **Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl).
 
-**0.3.2 is an installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.2)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
+**0.3.3 is an installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.3)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
 
 ## Requirements and compatibility
 
@@ -29,13 +29,13 @@ Closing the window leaves SwooshDrop receiving in the tray. **Stop receiving** r
 
 ## Updates and removal
 
-Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. The existing `%LOCALAPPDATA%\Programs\WinDrop` data folder and `WinDropRuntime` WSL distribution retain their internal names so upgrades do not move or erase existing data. Version 0.3.2 waits for USB enumeration after startup and clears stale forwarding of the selected adapter when WSL kept a virtual copy after detach. Remove **SwooshDrop** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
+Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. The existing `%LOCALAPPDATA%\Programs\WinDrop` data folder and `WinDropRuntime` WSL distribution retain their internal names so upgrades do not move or erase existing data. Version 0.3.2 added USB enumeration recovery; 0.3.3 refreshes AirDrop discovery announcements more often. Remove **SwooshDrop** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
 
 ## Validation and limits
 
-Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.2 build and setup tests pass. A controlled stop/start on the development PC released the selected WSL USB port and restored the receiver with one attachment; an iPhone 16 Pro Max then sent a 410,967-byte JPEG successfully. A full Windows reboot with this build remains untested.
+Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.3 protocol suite and setup tests pass. In one live test, discovery changed from several minutes to under 30 seconds after increasing announcement frequency; a 231,366-byte JPEG then transferred successfully. This is one observation, not a guaranteed discovery time. A full Windows reboot with this build remains untested.
 
-Discovery remains intermittent. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, reboot recovery, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
+Discovery can still be intermittent, especially with a 2.4 GHz-only adapter. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, reboot recovery, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
 
 ## Building
 

@@ -459,11 +459,11 @@ index 68e7ebb..9a7d670 100644
 +        {
 +            try
 +            {
-+                // Repeat initial announcements on the lossy radio, then refresh
-+                // before the 120-second DNS record lifetime expires.
++                // Repeat initial announcements, then use a short varied interval
++                // to reach peers during their brief channel-6 AWDL windows.
 +                for (int i = 0; ; i++)
 +                {
-+                    await Task.Delay(TimeSpan.FromSeconds(i < 2 ? 1 : 30), _lifetime.Token);
++                    await Task.Delay(i < 2 ? TimeSpan.FromSeconds(1) : TimeSpan.FromMilliseconds(Random.Shared.Next(1200, 2401)), _lifetime.Token);
 +                    await _owner.AnnounceAsync(record, _lifetime.Token);
 +                }
 +            }

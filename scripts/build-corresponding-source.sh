@@ -17,7 +17,7 @@ git -C "$lab/windrop" archive 5a5dc52ce6eda298789622cb92d548d64d5673cc | tar -x 
 cp "$repo/patches/prototype-changes.patch" "$stage/windrop/windrop-product.patch"
 cp -a "$repo/scripts" "$repo/licenses" "$repo/docs" "$repo/THIRD-PARTY-NOTICES.md" "$stage/packaging/"
 cat > "$stage/README.txt" <<'EOF'
-Corresponding source for SwooshDrop 0.3.2 runtime.
+Corresponding source for SwooshDrop 0.3.3 runtime.
 Kernel: Microsoft WSL Linux c21a03b2943d147c280bdf32530d4fe6badfd6bd.
 Copy windrop.config to .config, use LOCALVERSION= and make olddefconfig;
 make -j8 vmlinux modules to generate matching symbol versions and modules.
