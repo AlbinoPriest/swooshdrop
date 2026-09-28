@@ -24,8 +24,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.1.0")]
-[assembly: AssemblyFileVersion("0.3.1.0")]
+[assembly: AssemblyVersion("0.3.2.0")]
+[assembly: AssemblyFileVersion("0.3.2.0")]
 
 public class Preferences
 {
@@ -304,7 +304,21 @@ public sealed class WinDropTray
                 var profile = AdapterCatalog.Profile(sessionDevice, ResourceText("adapters.json"));
                 if (profile == null) throw new Exception("This adapter is not supported by the installed radio driver package.");
                 bus = Convert.ToString(target["BusId"]);
-                if (!string.IsNullOrEmpty(Convert.ToString(target["ClientIPAddress"]))) Wsl("bash", control, "attached", identity.Vendor, identity.Product, identity.Serial); else Run(usb, "attach", "--wsl", settings.RuntimeDistro, "--busid", bus);
+                int count = int.Parse(Wsl("bash", control, "count", identity.Vendor, identity.Product, identity.Serial));
+                bool reportedAttached = !string.IsNullOrEmpty(Convert.ToString(target["ClientIPAddress"]));
+                if (count > 1 || (count == 1 && !reportedAttached))
+                {
+                    if (count > 1 && string.IsNullOrEmpty(identity.Serial)) throw new Exception("Multiple matching USB adapters lack a unique serial. Reconnect only the selected adapter before receiving.");
+                    if (reportedAttached) Run(usb, "detach", "--busid", bus);
+                    Wsl("bash", control, "release", identity.Vendor, identity.Product, identity.Serial);
+                    count = 0; reportedAttached = false;
+                }
+                if (count == 0)
+                {
+                    if (reportedAttached) Run(usb, "detach", "--busid", bus);
+                    Run(usb, "attach", "--wsl", settings.RuntimeDistro, "--busid", bus);
+                    Wsl("bash", control, "attached", identity.Vendor, identity.Product, identity.Serial);
+                }
                 ownsSession = true; token = Guid.NewGuid().ToString("N"); Directory.CreateDirectory(saveFolder);
                 var info = Info("wsl.exe", "-d", settings.RuntimeDistro, "-u", "root", "--exec", "setsid", "--wait", "bash", script, profile.Driver, "--ui-events", LinuxPath(saveFolder), token, identity.Vendor, identity.Product, identity.Serial);
                 info.RedirectStandardInput = true;
@@ -332,6 +346,8 @@ public sealed class WinDropTray
                 if (receiver != null && !receiver.HasExited && !receiver.WaitForExit(10000)) throw new Exception("Receiver has not stopped yet.");
                 var state = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(Run(usb, "state"));
                 foreach (Dictionary<string, object> device in (IEnumerable)state["Devices"]) if (string.Equals(Convert.ToString(device["InstanceId"]), sessionDevice, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Convert.ToString(device["ClientIPAddress"]))) Run(usb, "detach", "--busid", Convert.ToString(device["BusId"]));
+                var identity = AdapterIdentity.Parse(sessionDevice);
+                Wsl("bash", control, "release", identity.Vendor, identity.Product, identity.Serial);
             });
             ownsSession = false; if (receiver != null) { receiver.Dispose(); receiver = null; }
             SetStatus("Receiving is off", "Start receiving whenever you're ready.", false);
