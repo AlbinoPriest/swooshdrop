@@ -33,7 +33,7 @@ Quit the running app before rerunning setup. Gallery history and preferences are
 
 ## Validation and limits
 
-Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.2 build and setup tests pass. A controlled stop/start on the development PC released the selected WSL USB port and restored the receiver with one attachment. A reboot and phone transfer using this exact build still need validation.
+Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite had **224 passing tests** and OWL **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.2 build and setup tests pass. A controlled stop/start on the development PC released the selected WSL USB port and restored the receiver with one attachment; an iPhone 16 Pro Max then sent a 410,967-byte JPEG successfully. A full Windows reboot with this build remains untested.
 
 Discovery remains intermittent. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, reboot recovery, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
 
