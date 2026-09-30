@@ -4,7 +4,7 @@ Receive photos, files, and web links from your iPhone's native **Share → AirDr
 
 **Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl).
 
-**0.3.5 is the current downloadable installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.5)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed. The 0.3.6 visual and paused-startup updates are in the repository; that installer has not been published yet.
+**0.3.6 is the current downloadable installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.6)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
 
 ## Requirements and compatibility
 
@@ -33,9 +33,9 @@ Quit the running app before rerunning setup. Gallery history and preferences are
 
 ## Validation and limits
 
-Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite now has **227 passing tests**, the bridge relay regression test passes, and OWL had **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.4 suite includes a regression test in which a new transfer request starts while an earlier discovery connection remains open. After the bridge update, the same iPhone sent three photos successfully, including a 2 MB HEIC that uploaded in seven seconds; one still had a short wait before sending. A full Windows reboot with this build remains untested.
+Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite now has **227 passing tests**, the bridge relay regression test passes, and OWL had **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.4 suite includes a regression test in which a new transfer request starts while an earlier discovery connection remains open. After the bridge update, the same iPhone sent three photos successfully, including a 2 MB HEIC that uploaded in seven seconds; one still had a short wait before sending. The development PC's owner reported that SwooshDrop worked after a full Windows restart with the 0.3.6 app.
 
-Discovery can still be intermittent, especially with a 2.4 GHz-only adapter. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged use, reboot recovery, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
+Discovery can still be intermittent, especially with a 2.4 GHz-only adapter. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged and repeated reboot use, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
 
 ## Building
 
