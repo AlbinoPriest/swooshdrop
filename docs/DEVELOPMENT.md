@@ -23,4 +23,3 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDropSetup.ps1
 ```
 
 `Install-WinDrop.ps1` remains a developer app-only installer; it does not provision a fresh PC. Older console `AirDropLab` scripts are development helpers tied to the original test hardware. New kernels require matching driver builds and regression testing, not forced module loading.
-
