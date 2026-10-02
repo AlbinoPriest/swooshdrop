@@ -11,6 +11,7 @@ adapter-setup.log
 *.jpg
 *.jpeg
 *.png
+!docs/images/*.png
 *.mov
 *.mp4
 

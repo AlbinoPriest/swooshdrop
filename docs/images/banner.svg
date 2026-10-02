@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title description">
+  <title id="title">SwooshDrop — a little air, through Windows.</title>
+  <desc id="description">The coral Through icon beside SwooshDrop's wordmark on a charcoal background. An unofficial hardware beta for receiving iPhone AirDrop files on Windows.</desc>
+  <defs>
+    <g id="through" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M40 13 L20 13 C15 13 12 17 12 22 L12 42 C12 48 16 52 22 52 L42 52 C48 52 52 48 52 42 L52 31"/>
+      <path d="M23 22 C26 30 31 36 43 42"/>
+      <path d="M31 43 L45 43 L45 29"/>
+    </g>
+  </defs>
+  <rect width="1280" height="320" rx="28" fill="#17191C"/>
+  <path d="M790 0 C960 180 1060 10 1280 165" stroke="#363A41" stroke-width="1" fill="none"/>
+  <path d="M820 320 C930 130 1120 280 1280 90" stroke="#363A41" stroke-width="1" fill="none"/>
+  <use href="#through" transform="translate(920 -48) scale(6.3)" stroke="#F39485" opacity="0.1"/>
+  <rect x="64" y="88" width="116" height="116" rx="29" fill="#F39485"/>
+  <use href="#through" transform="translate(64 88) scale(1.8125)" stroke="#241B1B"/>
+  <text x="214" y="92" font-family="Segoe UI,Arial,sans-serif" font-size="15" letter-spacing="3" fill="#F39485">IPHONE → WINDOWS</text>
+  <text x="210" y="157" font-family="Georgia,serif" font-size="62" fill="#F1EDE8">SwooshDrop</text>
+  <text x="214" y="200" font-family="Segoe UI,Arial,sans-serif" font-size="24" fill="#B2B0B0">A little air, through Windows.</text>
+  <rect x="214" y="235" width="149" height="30" rx="15" fill="#292D33"/>
+  <text x="288.5" y="255" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" letter-spacing="1.2" fill="#F1EDE8">HARDWARE BETA</text>
+  <text x="383" y="255" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#B2B0B0">Photos · files · web links</text>
+</svg>

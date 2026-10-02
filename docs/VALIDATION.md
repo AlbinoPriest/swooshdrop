@@ -1,0 +1,6 @@
+# Validation and limits
+
+Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite now has **227 passing tests**, the bridge relay regression test passes, and OWL had **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.4 suite includes a regression test in which a new transfer request starts while an earlier discovery connection remains open. After the bridge update, the same iPhone sent three photos successfully, including a 2 MB HEIC that uploaded in seven seconds; one still had a short wait before sending. The development PC's owner reported that SwooshDrop worked after a full Windows restart with the 0.3.6 app.
+
+Discovery can still be intermittent, especially with a 2.4 GHz-only adapter. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged and repeated reboot use, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
+

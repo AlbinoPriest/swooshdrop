@@ -1,72 +1,108 @@
-# SwooshDrop
+<p align="center">
+  <img src="docs/images/banner.svg" alt="SwooshDrop — a little air, through Windows" width="100%">
+</p>
 
-Receive photos, files, and web links from your iPhone's native **Share → AirDrop** menu on Windows. Includes a received-files gallery, image and web-address previews, notification approval buttons, automatic opening of accepted links, a tray app, and optional startup at sign-in.
+<p align="center">
+  Receive photos, files, and web links from your iPhone’s native <strong>Share → AirDrop</strong> menu on Windows.<br>
+  No iPhone app needed.
+</p>
 
-**Unofficial community project.** Developed independently by AlbinoPriest; not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. The AirDrop protocol implementation is adapted from Uvejs Gjelaj's MIT-licensed [WinDrop](https://github.com/UvejsGj/WinDrop), with AWDL provided by [OWL](https://github.com/seemoo-lab/owl).
+<p align="center">
+  <a href="https://github.com/AlbinoPriest/swooshdrop/releases/download/v0.3.6/SwooshDropSetup.exe"><strong>Download the Windows beta ↗</strong></a>
+  &nbsp; · &nbsp;
+  <a href="docs/COMPATIBILITY.md">Check your adapter</a>
+  &nbsp; · &nbsp;
+  <a href="https://github.com/AlbinoPriest/swooshdrop/issues">Report an issue</a>
+</p>
 
-**0.3.6 is the current downloadable installer beta.** Download **[SwooshDropSetup.exe](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.6)**, connect a compatible **dedicated external USB Wi-Fi adapter**, and run setup. The adapter is reserved for AirDrop while receiving; Windows keeps its separate internet connection. Setup creates its own `WinDropRuntime` WSL environment. No iPhone app is needed.
+> **Hardware beta:** requires a compatible **dedicated USB Wi-Fi adapter**, WSL 2, and a separate internet connection. The tested adapter is the TP-Link TL-WN725N with USB ID `0bda:8179`. Other catalog entries are experimental. [Compatibility details →](docs/COMPATIBILITY.md)
 
-## Requirements and compatibility
+## Your latest arrivals, in one place
 
-The current `main` branch includes an unreleased **Tempo Soft** interface refresh: charcoal panels, soft coral accents, rounded controls, left navigation, and brief animations that respect Windows' animation setting. The **Through** icon is used throughout the app and shortcuts. Its tray variant has a transparent background and grey outline while paused or off, and a filled coral tile when the receiver is ready. The tray panel sizes to its contents so longer status messages keep the bottom actions visible. These changes are not included in the downloadable 0.3.6 installer yet.
+<img src="docs/images/received.png" alt="SwooshDrop’s charcoal and coral interface showing demo photos, a web link, and a PDF in its received-files list" width="100%">
 
-- Windows 10 22H2 or Windows 11, Intel/AMD x64, virtualization, and WSL 2. The development Windows 11 PC has been tested; a fresh second PC and Windows 10 are unverified.
-- This beta's radio modules require **6.18.33.2-microsoft-standard-WSL2**. Setup refuses incompatible kernels; it does not downgrade WSL or boot a custom kernel.
-- A compatible dedicated USB Wi-Fi adapter and separate internet connection. **TP-Link TL-WN725N, USB ID `0bda:8179` (RTL8188EU)** has passed phone transfers. Other revisions may differ.
-- Administrator permission for initial prerequisites and sharing the selected USB device. Everyday receiving runs as your normal user.
-- Internet and several GB of free space for initial setup. The approximately 256 MiB installer includes source materials; setup downloads a verified Ubuntu image and runtime packages.
+**Preview of the current `main` branch**, using demo files and illustrative thumbnails. The Tempo Soft design, Through icon, and new tray behavior are included in source; the downloadable **0.3.6 beta** currently uses the earlier interface.
 
-The catalog contains **86 USB device IDs** covered by bundled Realtek and MediaTek drivers. All except the tested ID are **experimental**, not guaranteed AirDrop compatibility. Arbitrary adapters, built-in PCI Wi-Fi, sharing Windows' internet adapter, ARM/32-bit PCs, and Contacts Only are unsupported. See [compatibility](docs/COMPATIBILITY.md).
+| From your iPhone | On your PC |
+| :--- | :--- |
+| **Photos & files** | Receive HEIC, PNG, documents, and other files. Browse the received list, open an item, or jump to its folder. |
+| **Web links** | See the address before accepting. Accepted HTTP/HTTPS links can open in your default browser. |
+| **Your approval** | Choose Windows notifications or a matching SwooshDrop popup. Every incoming transfer needs your approval. |
+| **Your files, preserved** | SwooshDrop saves the received file stream without resizing or recompressing it. Your iPhone decides what it shares. |
 
-## Install and receive
+## Small when you need it
 
-1. Run **SwooshDropSetup.exe**, then **Check prerequisites**. Restart manually if Windows requests it, then rerun setup. Existing WSL distributions and Docker are preserved.
-2. Select your dedicated USB adapter. Setup shows its device ID and tested/experimental status. Choose optional startup, then **Install SwooshDrop**.
-3. Open SwooshDrop. On iPhone enable Wi-Fi and Bluetooth, choose **Everyone for 10 Minutes**, then **Share → AirDrop → SwooshDrop**.
-4. Review the sender and preview and click **Accept** or **Decline** in the notification or app. Unanswered requests expire after 55 seconds. Sender display names are unverified.
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <img src="docs/images/tray.png" alt="Compact SwooshDrop tray panel with receiving control, last received item, adapter and runtime status, and quick actions" width="300">
+      <p><strong>A useful little tray panel</strong><br>Receiving controls, your latest arrival, and quick access to files and settings.</p>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <img src="docs/images/incoming.png" alt="SwooshDrop incoming AirDrop popup with an illustrative photo preview, sender, and Accept and Decline buttons" width="300">
+      <p><strong>A preview before you accept</strong><br>Check the sender, photo preview, or web address before receiving.</p>
+    </td>
+  </tr>
+</table>
 
-New installations save files to **Downloads\SwooshDrop** by default; upgrades keep the previously selected folder. Thumbnails are separate cached previews. SwooshDrop does not resize or recompress received file streams; the iPhone controls what it shares. Exact equality with iPhone originals has not been verified by hashes. Accepted HTTP/HTTPS links are saved and open in the default browser; disable that behavior in Settings if desired.
+In the current source build, the tray icon is a grey outline with a transparent background while paused or off, and a filled coral tile when the receiver is ready. The panel grows to fit longer status messages. Left-click opens the panel; double-click opens the app.
 
-Closing the window leaves SwooshDrop receiving in the tray. Left-click the tray icon for status, the latest transfer, adapter and runtime state, and quick actions; double-click opens the main window. In Settings → Startup, **Keep receiving paused at sign-in** opens only the tray app at Windows sign-in, leaving the dedicated adapter and WSL runtime idle until you press **Start receiving**. While paused, SwooshDrop is absent from the iPhone's AirDrop sheet. Fresh manual launches can still start receiving automatically. **Stop receiving** returns the adapter to Windows and terminates the app-owned WSL distribution; other WSL distributions remain running. Tray **Quit** stops the session and exits. **Settings → Adapter setup** stops receiving and opens setup to change hardware or repair the runtime. Settings also lets you choose Windows notifications or SwooshDrop's own approval popup, and view live Activity, Radio, and Bridge logs.
+## Make it yours
 
-## Updates and removal
+<details>
+  <summary><strong>See settings: startup, notifications, files, and diagnostics</strong></summary>
+  <br>
+  <img src="docs/images/settings.png" alt="SwooshDrop settings showing startup preferences and the choice between Windows notifications and the integrated app popup" width="100%">
+</details>
 
-Quit the running app before rerunning setup. Gallery history and preferences are preserved, except for the explicitly chosen adapter and startup setting. The existing `%LOCALAPPDATA%\Programs\WinDrop` data folder and `WinDropRuntime` WSL distribution retain their internal names so upgrades do not move or erase existing data. Version 0.3.2 added USB enumeration recovery; 0.3.3 increased discovery announcements; 0.3.4 handles overlapping connections so a lingering discovery session does not block a transfer request, and preserves the bridge's response path when a sender finishes writing. Version 0.3.5 added the tray status panel, in-app approval option, and live logs in Settings. Version 0.3.6 refines the interface with Tempo's charcoal-and-coral layout and Daylight's editorial heading font, shows files in a compact list, and adds the paused-at-sign-in option. Remove **SwooshDrop** through Windows Installed Apps. Removal keeps received files, history, source, cache, and the dedicated runtime for reinstall; shared WSL/usbipd prerequisites remain installed. See [installation details](docs/DISTRIBUTION.md) for paths and cleanup.
+- **Start with Windows**, with receiving enabled or paused until you need it.
+- **Pick your approval style:** Windows notifications or the integrated SwooshDrop popup.
+- **Choose your save folder** and whether accepted links open automatically.
+- **Read live logs** in Settings, with Activity, Radio, and Bridge views.
+- **Pause the receiver** to return the adapter to Windows and stop the dedicated Linux runtime. Other WSL distributions remain running.
 
-## Validation and limits
+Tempo Soft uses charcoal surfaces, soft coral accents, rounded controls, and editorial headings. Short hover, page, and popup animations respect Windows’ animation setting.
 
-Earlier versions received single photos, three-photo batches, HEIC/PNG files, and Safari links from an iPhone 16 Pro Max on iOS 27.0. The protocol suite now has **227 passing tests**, the bridge relay regression test passes, and OWL had **52 passing tests**. The setup engine provisioned a clean Ubuntu runtime on the development PC. The 0.3.4 suite includes a regression test in which a new transfer request starts while an earlier discovery connection remains open. After the bridge update, the same iPhone sent three photos successfully, including a 2 MB HEIC that uploaded in seven seconds; one still had a short wait before sending. The development PC's owner reported that SwooshDrop worked after a full Windows restart with the 0.3.6 app.
+## Get your first drop
 
-Discovery can still be intermittent, especially with a 2.4 GHz-only adapter. Sustained throughput, large files, Live Photos, metadata fidelity, prolonged and repeated reboot use, experimental adapters, and fresh second-PC installation need testing. A successful setup on the development PC does not establish universal compatibility. Builds are currently unsigned.
+1. **Check your hardware.** Use a compatible dedicated USB Wi-Fi adapter, with Ethernet or a separate adapter for internet access.
+2. **[Download the beta](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.6)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
+3. **Start receiving.** On your iPhone, turn on Wi-Fi and Bluetooth and choose AirDrop’s **Everyone for 10 Minutes** option.
+4. **Share → AirDrop → SwooshDrop.** Check the preview and press **Accept** on your PC.
 
-## Building
+Fresh installations save to **Downloads\SwooshDrop**. Upgrades keep your chosen folder and history. Closing the main window leaves the tray app running. Unanswered approval requests expire after 55 seconds; sender display names are unverified.
 
-The Windows frontend uses .NET Framework 4.8's compiler. The Linux backend must first be built from the pinned WinDrop source and product patch.
+## What you’ll need
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDrop.ps1 -BackendDirectory <backend-output-directory>
-```
+| Requirement | Current beta |
+| :--- | :--- |
+| **Windows** | Windows 10 22H2 or Windows 11, Intel/AMD x64, virtualization, and WSL 2. Development testing has been on Windows 11. |
+| **Wi-Fi hardware** | A compatible dedicated USB Wi-Fi adapter. **TP-Link TL-WN725N / `0bda:8179`** has passed iPhone transfers; hardware revisions can differ. |
+| **Internet connection** | Ethernet or a separate Wi-Fi adapter. The AirDrop adapter is reserved while receiving. |
+| **Initial setup** | Administrator access for prerequisites and USB sharing, internet access, and several GB of free space. Everyday receiving runs as your normal user. |
 
-Runtime and source payloads are built in the provisioned Linux environment in [build notes](docs/SETUP.md):
+The adapter catalog includes **86 USB device IDs** with bundled Realtek and MediaTek drivers. All except the tested ID are experimental. Built-in PCI Wi-Fi, sharing Windows’ active Wi-Fi adapter, ARM/32-bit PCs, arbitrary adapters, and Contacts Only are unsupported.
 
-```bash
-bash scripts/build-extra-radio-modules.sh
-bash scripts/build-runtime-payload.sh
-bash scripts/build-corresponding-source.sh
-```
+This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The installer is approximately **256 MiB** and includes corresponding source materials; setup downloads Ubuntu and runtime packages separately.
 
-Then build the redistributable setup on Windows:
+**Still a beta.** Discovery can be intermittent. Fresh second-PC and Windows 10 installs, sustained throughput, Live Photos, metadata fidelity, and experimental adapters need more testing. Builds are unsigned. [What has been tested →](docs/VALIDATION.md)
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-WinDropSetup.ps1
-```
+## Explore the project
 
-`Install-WinDrop.ps1` remains a developer app-only installer; it does not provision a fresh PC. Older console `AirDropLab` scripts are development helpers tied to the original test hardware. New kernels require matching driver builds and regression testing, not forced module loading.
+| Guide | What’s inside |
+| :--- | :--- |
+| [Adapter compatibility](docs/COMPATIBILITY.md) | Supported device IDs, tested hardware, and experimental drivers. |
+| [Installation & updates](docs/DISTRIBUTION.md) | Setup, installation paths, removal, and WSL memory behavior. |
+| [Development & builds](docs/DEVELOPMENT.md) | Building the Windows app, runtime, source payload, and installer. |
+| [Validation](docs/VALIDATION.md) | Transfer tests, regression checks, and remaining limitations. |
+| [Third-party notices](THIRD-PARTY-NOTICES.md) | Component licenses and retained upstream notices. |
 
-## Attribution and licenses
+Found a bug? [Open an issue](https://github.com/AlbinoPriest/swooshdrop/issues) with your Windows version, adapter USB ID, and what happened. Remove personal paths and transfer names before sharing logs.
 
-The Windows frontend, installer, and hardware integration are developed independently for this project. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop), copyright 2026 Uvejs Gjelaj, under the MIT license; [OWL](https://github.com/seemoo-lab/owl) implements AWDL under GPL-3.0. Original copyright and license notices are retained. This project does not claim to have invented either implementation, and its maintainers do not represent the upstream projects.
+## Built on open source
 
-AirDrop, iPhone, and Windows are third-party product names used to describe compatibility. Their use does not imply endorsement. Our MIT license applies to our original work; bundled components retain their own licenses.
+SwooshDrop’s Windows frontend, installer, and hardware integration are developed independently by **AlbinoPriest**. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop), copyright 2026 Uvejs Gjelaj, under the MIT license. [OWL](https://github.com/seemoo-lab/owl) provides AWDL under GPL-3.0. Original copyright and license notices are retained.
 
-Setup embeds OWL, GPL kernel/driver modules, minimal firmware, notices, and their corresponding source. Those sources are installed under `Sources`. Ubuntu/codec packages are downloaded separately. See [notices](THIRD-PARTY-NOTICES.md) and [pinned source revisions](source-versions.json). Personal media, captures, credentials, logs, and Linux home directories are excluded from packages and source control.
+Our [MIT license](LICENSE) covers our original work; bundled components retain their own licenses. Setup includes OWL, GPL kernel/driver modules, firmware, notices, and corresponding sources, installed under `Sources`. See [component notices](THIRD-PARTY-NOTICES.md) and [pinned revisions](source-versions.json).
+
+**Unofficial community project.** SwooshDrop is not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. AirDrop, iPhone, and Windows are third-party product names used to describe compatibility.
