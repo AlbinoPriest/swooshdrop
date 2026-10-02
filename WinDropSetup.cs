@@ -186,6 +186,7 @@ public sealed class SetupEngine
         Run("wsl.exe", "-d", Distro, "-u", "root", "--exec", "bash", linuxScript, linuxPayload);
         Report("Installing the Windows app, shortcuts, and notification support…");
         string app = Path.Combine(Home, "SwooshDrop.exe"); Extract("Setup.SwooshDrop.exe", app);
+        Extract("Setup.AppIcon.ico", Path.Combine(Home, "SwooshDrop-through.ico"));
         Directory.CreateDirectory(Path.Combine(Home, "Data", "Runtime")); Directory.CreateDirectory(Path.Combine(Home, "Data", "Previews")); Directory.CreateDirectory(Path.Combine(Home, "Data", "Logs"));
         string settingsPath = Path.Combine(Home, "Data", "settings.json");
         var prefs = File.Exists(settingsPath) ? Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(settingsPath)) : new Dictionary<string, object> { { "SaveFolder", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SwooshDrop") }, { "ReceiveOnLaunch", true }, { "Notifications", true }, { "OpenLinksOnReceive", true } };
@@ -206,7 +207,7 @@ public sealed class SetupEngine
     {
         if (Process.GetProcessesByName("WinDrop").Length > 0 || Process.GetProcessesByName("SwooshDrop").Length > 0) throw new InvalidOperationException("Quit SwooshDrop from its tray menu first.");
         NativeIntegration.SetAutostart(Path.Combine(Home, "SwooshDrop.exe"), false);
-        foreach (string path in new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), Path.Combine(Home, "SwooshDrop.exe"), Path.Combine(Home, "WinDrop.exe"), Path.Combine(Home, "WinDropSetup.exe") }) if (File.Exists(path)) File.Delete(path);
+        foreach (string path in new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SwooshDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), Path.Combine(Home, "SwooshDrop.exe"), Path.Combine(Home, "SwooshDrop-through.ico"), Path.Combine(Home, "WinDrop.exe"), Path.Combine(Home, "WinDropSetup.exe") }) if (File.Exists(path)) File.Delete(path);
         foreach (string key in new[] { @"Software\Classes\windrop", @"Software\Classes\AppUserModelId\WinDrop.PC", @"Software\Classes\CLSID\{74331E92-9FD9-4BEE-8563-83110C44FF39}", @"Software\Microsoft\Windows\CurrentVersion\Uninstall\WinDrop" }) Registry.CurrentUser.DeleteSubKeyTree(key, false);
         // Keep received files, history, and the dedicated WSL distribution for reinstall.
     }

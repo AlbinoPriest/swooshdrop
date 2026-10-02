@@ -7,6 +7,7 @@ $arguments = @('/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+
 foreach ($assembly in @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Web.Extensions.dll')) { $arguments += '/reference:'+(Join-Path $framework $assembly) }
 $resources = @{
  'dist\SwooshDrop.exe' = 'Setup.SwooshDrop.exe'
+ 'obj\AppIcon.ico' = 'Setup.AppIcon.ico'
  'obj\runtime-payload.tar.gz' = 'Setup.runtime-payload.tar.gz'
  'obj\corresponding-source.tar.gz' = 'Setup.corresponding-source.tar.gz'
  'scripts\bootstrap-runtime.sh' = 'Setup.bootstrap-runtime.sh'

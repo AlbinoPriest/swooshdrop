@@ -8,6 +8,8 @@ Receive photos, files, and web links from your iPhone's native **Share → AirDr
 
 ## Requirements and compatibility
 
+The current `main` branch includes an unreleased **Tempo Soft** interface refresh: charcoal panels, soft coral accents, rounded controls, left navigation, and brief animations that respect Windows' animation setting. The **Through** icon is used throughout the app and shortcuts. Its tray variant has a transparent background and grey outline while paused or off, and a filled coral tile when the receiver is ready. The tray panel sizes to its contents so longer status messages keep the bottom actions visible. These changes are not included in the downloadable 0.3.6 installer yet.
+
 - Windows 10 22H2 or Windows 11, Intel/AMD x64, virtualization, and WSL 2. The development Windows 11 PC has been tested; a fresh second PC and Windows 10 are unverified.
 - This beta's radio modules require **6.18.33.2-microsoft-standard-WSL2**. Setup refuses incompatible kernels; it does not downgrade WSL or boot a custom kernel.
 - A compatible dedicated USB Wi-Fi adapter and separate internet connection. **TP-Link TL-WN725N, USB ID `0bda:8179` (RTL8188EU)** has passed phone transfers. Other revisions may differ.

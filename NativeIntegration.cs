@@ -12,15 +12,17 @@ public static class NativeIntegration
     [DllImport("shell32.dll")] static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
     public static void Register(string executable)
     {
+        string iconPath = Path.Combine(Path.GetDirectoryName(executable), "SwooshDrop-through.ico");
+        if (!File.Exists(iconPath)) iconPath = executable;
         SetCurrentProcessExplicitAppUserModelID("WinDrop.PC");
         using (var protocol = Registry.CurrentUser.CreateSubKey(@"Software\Classes\windrop"))
         {
             protocol.SetValue("", "URL:SwooshDrop"); protocol.SetValue("URL Protocol", "");
             using (var command = protocol.CreateSubKey(@"shell\open\command")) command.SetValue("", "\"" + executable + "\" \"%1\"");
-            using (var icon = protocol.CreateSubKey("DefaultIcon")) icon.SetValue("", "\"" + executable + "\",0");
+            using (var icon = protocol.CreateSubKey("DefaultIcon")) icon.SetValue("", "\"" + iconPath + "\",0");
         }
         using (var app = Registry.CurrentUser.CreateSubKey(@"Software\Classes\AppUserModelId\WinDrop.PC"))
-        { app.SetValue("DisplayName", "SwooshDrop"); app.SetValue("IconUri", executable); app.SetValue("CustomActivator", ToastClassId); }
+        { app.SetValue("DisplayName", "SwooshDrop"); app.SetValue("IconUri", iconPath); app.SetValue("CustomActivator", ToastClassId); }
         using (var callback = Registry.CurrentUser.CreateSubKey(@"Software\Classes\CLSID\" + ToastClassId))
         {
             callback.SetValue("", "SwooshDrop notification callback");
@@ -34,7 +36,7 @@ public static class NativeIntegration
         var shell = (IShellLinkW)new ShellLink();
         try
         {
-            shell.SetPath(executable); shell.SetDescription("Receive AirDrop on Windows"); shell.SetWorkingDirectory(Path.GetDirectoryName(executable)); shell.SetIconLocation(executable, 0);
+            shell.SetPath(executable); shell.SetDescription("Receive AirDrop on Windows"); shell.SetWorkingDirectory(Path.GetDirectoryName(executable)); shell.SetIconLocation(iconPath, 0);
             var store = (IPropertyStore)shell;
             var key = new PropertyKey { FormatId = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), PropertyId = 5 };
             var value = new PropVariant { Type = 31, Pointer = Marshal.StringToCoTaskMemUni("WinDrop.PC") };
@@ -44,6 +46,14 @@ public static class NativeIntegration
             Marshal.Copy(new Guid(ToastClassId).ToByteArray(), 0, value.Pointer, 16);
             try { store.SetValue(ref key, ref value); store.Commit(); } finally { Marshal.FreeCoTaskMem(value.Pointer); }
             ((IPersistFile)shell).Save(shortcut, true);
+            string desktopShortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SwooshDrop.lnk");
+            if (File.Exists(desktopShortcut))
+            {
+                ((IPersistFile)shell).Load(desktopShortcut, 0);
+                var target = new StringBuilder(1024); shell.GetPath(target, target.Capacity, IntPtr.Zero, 0);
+                if (string.Equals(target.ToString(), executable, StringComparison.OrdinalIgnoreCase))
+                { shell.SetIconLocation(iconPath, 0); ((IPersistFile)shell).Save(desktopShortcut, true); }
+            }
         }
         finally { Marshal.ReleaseComObject(shell); }
         // Explorer caches unknown URI schemes. Refresh its cache after first registration.

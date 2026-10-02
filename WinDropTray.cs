@@ -17,7 +17,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -73,6 +75,8 @@ public sealed class WinDropTray
     readonly ObservableCollection<TransferItem> items = new ObservableCollection<TransferItem>();
     readonly Window window;
     readonly Forms.NotifyIcon tray = new Forms.NotifyIcon();
+    System.Drawing.Icon activeTrayIcon, pausedTrayIcon;
+    bool receiverReady;
     readonly DispatcherTimer retry = new DispatcherTimer();
     readonly DispatcherTimer expiry = new DispatcherTimer();
     readonly DispatcherTimer trayClickDelay = new DispatcherTimer();
@@ -87,6 +91,7 @@ public sealed class WinDropTray
     Window popup;
     Window flyout;
     DateTime ignoreTrayClicksUntil;
+    string currentPage = "Received";
 
     [STAThread]
     public static void Main(string[] args)
@@ -121,6 +126,8 @@ public sealed class WinDropTray
                 app.quitting = true; application.Shutdown(); return;
             }
             app.ExtractRuntime();
+            try { File.WriteAllBytes(Path.Combine(Path.GetDirectoryName(app.exe), "SwooshDrop-through.ico"), ResourceBytes("AppIcon.ico")); }
+            catch (Exception ex) { app.Log("App icon: " + ex.Message); }
             try { NativeIntegration.Register(app.exe); } catch (Exception ex) { app.Log("Windows registration: " + ex.Message); }
             app.ListenForActivation();
             ToastActivation.OnActivated = delegate(string activation) { app.OnUi(delegate { app.Activate(activation); }); };
@@ -138,7 +145,14 @@ public sealed class WinDropTray
                     app.SetStatus("Receiving paused", "Started with Windows without waking WSL. Press Start receiving when you want to AirDrop.", false);
                 if (args.Length > 0 && args[0].StartsWith("windrop://", StringComparison.OrdinalIgnoreCase)) app.Activate(args[0]);
             }), DispatcherPriority.ApplicationIdle);
-            try { application.Run(); } finally { ToastActivation.UnregisterServer(toastCookie); }
+            try { application.Run(); }
+            finally
+            {
+                app.tray.Dispose();
+                if (app.activeTrayIcon != null) app.activeTrayIcon.Dispose();
+                if (app.pausedTrayIcon != null) app.pausedTrayIcon.Dispose();
+                ToastActivation.UnregisterServer(toastCookie);
+            }
         }
     }
 
@@ -158,6 +172,7 @@ public sealed class WinDropTray
         runtime = Path.Combine(data, "Runtime"); Directory.CreateDirectory(data); Directory.CreateDirectory(Path.Combine(data, "Previews"));
         settings = Read<Preferences>("settings.json") ?? new Preferences();
         window = (Window)XamlReader.Parse(ResourceText("MainWindow.xaml"));
+        if (!rendering) ConfigureButtonMotion();
         window.SourceInitialized += delegate
         {
             try
@@ -166,10 +181,15 @@ public sealed class WinDropTray
                 IntPtr hwnd = new WindowInteropHelper(window).Handle;
                 if (DwmSetWindowAttribute(hwnd, 20, ref enabled, sizeof(int)) != 0)
                     DwmSetWindowAttribute(hwnd, 19, ref enabled, sizeof(int));
+                // Windows 11 rounds the native frame; older Windows keeps its standard frame.
+                int corners = 2, caption = 0x001C1917, border = 0x00413A36;
+                DwmSetWindowAttribute(hwnd, 33, ref corners, sizeof(int));
+                DwmSetWindowAttribute(hwnd, 35, ref caption, sizeof(int));
+                DwmSetWindowAttribute(hwnd, 34, ref border, sizeof(int));
             }
             catch (Exception ex) { Log("Dark title bar: " + ex.Message); }
         };
-        try { window.Icon = Bitmap(ResourceBytes("AppIcon.png")); } catch { }
+        ApplyBrand(window);
         var saved = Read<List<TransferItem>>("history.json");
         if (saved != null) foreach (var item in saved) { if (items.Count >= 500) break; items.Add(item); }
         Find<ItemsControl>("Transfers").ItemsSource = items;
@@ -225,7 +245,10 @@ public sealed class WinDropTray
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
         {
-            tray.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exe); tray.Text = "SwooshDrop"; tray.Visible = true;
+            activeTrayIcon = LoadTrayIcon("AppIcon.ico");
+            pausedTrayIcon = LoadTrayIcon("TrayPaused.ico");
+            UpdateTrayIcon();
+            tray.Text = "SwooshDrop"; tray.Visible = true;
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Open SwooshDrop", null, delegate { ShowWindow(); });
             menu.Items.Add("Open received folder", null, delegate { OpenFolder(); });
@@ -244,24 +267,66 @@ public sealed class WinDropTray
 
     void Page(string name)
     {
+        bool changed = currentPage != name;
         foreach (string page in new string[] { "Received", "Settings", "About" })
         {
             ((UIElement)window.FindName(page + "Page")).Visibility = page == name ? Visibility.Visible : Visibility.Collapsed;
             var nav = Find<Button>(page + "Nav");
-            nav.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#4A3834" : "#2E2927"));
-            nav.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#F6F0E9" : "#D5CBC4"));
-            nav.BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EE725D"));
-            nav.BorderThickness = page == name ? new Thickness(3, 0, 0, 0) : new Thickness(0);
+            nav.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#292D33" : "#1C1F23"));
+            nav.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(page == name ? "#F1EDE8" : "#B2B0B0"));
+            nav.BorderThickness = new Thickness(0);
         }
         var title = Find<TextBlock>("PageTitleText");
         var subtitle = Find<TextBlock>("PageSubtitleText");
-        if (title != null) title.Text = name == "Received" ? "Send it. Got it." : name == "Settings" ? "Make it yours." : "About SwooshDrop.";
-        if (subtitle != null) subtitle.Text = name == "Received" ? "A direct route from your iPhone to this PC." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
+        if (title != null) title.Text = name == "Received" ? "Your latest arrivals." : name == "Settings" ? "Make it yours." : "About SwooshDrop.";
+        if (subtitle != null) subtitle.Text = name == "Received" ? "Photos, files and links. Right here." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
         if (name == "Settings") RefreshLogView();
+        currentPage = name;
+        if (changed) AnimateEntrance(Find<FrameworkElement>(name + "Page"), 8, 180);
+    }
+    void AnimateEntrance(FrameworkElement surface, double offset, int milliseconds)
+    {
+        if (rendering || surface == null || !SystemParameters.ClientAreaAnimation) return;
+        var move = new TranslateTransform();
+        surface.RenderTransform = move;
+        var duration = new Duration(TimeSpan.FromMilliseconds(milliseconds));
+        var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+        // Stop ends the motion at completion and restores the final base values.
+        var slide = new DoubleAnimation(offset, 0, duration) { EasingFunction = easing, FillBehavior = FillBehavior.Stop };
+        var fade = new DoubleAnimation(0, 1, duration) { EasingFunction = easing, FillBehavior = FillBehavior.Stop };
+        Timeline.SetDesiredFrameRate(slide, 60); Timeline.SetDesiredFrameRate(fade, 60);
+        move.BeginAnimation(TranslateTransform.YProperty, slide);
+        surface.BeginAnimation(UIElement.OpacityProperty, fade);
+    }
+    static void ConfigureButtonMotion()
+    {
+        EventManager.RegisterClassHandler(typeof(Button), UIElement.MouseEnterEvent,
+            new MouseEventHandler(delegate(object sender, MouseEventArgs e) { AnimateButton((Button)sender, 0.9); }));
+        EventManager.RegisterClassHandler(typeof(Button), UIElement.MouseLeaveEvent,
+            new MouseEventHandler(delegate(object sender, MouseEventArgs e) { AnimateButton((Button)sender, 1); }));
+    }
+    static void AnimateButton(Button button, double opacity)
+    {
+        if (!button.IsEnabled) return;
+        double from = button.Opacity;
+        button.BeginAnimation(UIElement.OpacityProperty, null);
+        button.Opacity = opacity;
+        if (!SystemParameters.ClientAreaAnimation) return;
+        var fade = new DoubleAnimation(from, opacity, TimeSpan.FromMilliseconds(140))
+        { FillBehavior = FillBehavior.Stop, EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        Timeline.SetDesiredFrameRate(fade, 60);
+        button.BeginAnimation(UIElement.OpacityProperty, fade);
     }
     void ShowWindow() { HideTrayFlyout(); window.Show(); window.WindowState = WindowState.Normal; window.Activate(); }
     void OpenFolder() { HideTrayFlyout(); Directory.CreateDirectory(settings.SaveFolder); Process.Start("explorer.exe", Quote(settings.SaveFolder)); }
     T FindFlyout<T>(string name) where T : class { return flyout == null ? null : flyout.FindName(name) as T; }
+    static void ApplyBrand(Window target)
+    {
+        var geometry = Geometry.Parse(ResourceText("ThroughPath.txt")); geometry.Freeze();
+        target.Resources["ThroughGeometry"] = geometry;
+        var icon = Bitmap(ResourceBytes("AppIcon.png"));
+        target.Icon = icon; target.Resources["BrandIcon"] = icon;
+    }
     void ToggleTrayFlyout()
     {
         try { if (flyout != null && flyout.IsVisible) HideTrayFlyout(); else OpenTrayFlyout(); }
@@ -273,6 +338,7 @@ public sealed class WinDropTray
         if (flyout == null)
         {
             flyout = (Window)XamlReader.Parse(ResourceText("TrayFlyout.xaml"));
+            ApplyBrand(flyout);
             flyout.Deactivated += delegate { if (!rendering) HideTrayFlyout(); };
             FindFlyout<Button>("FlyoutOpenButton").Click += delegate { ShowWindow(); };
             FindFlyout<Button>("FlyoutFolderButton").Click += delegate { OpenFolder(); };
@@ -288,6 +354,8 @@ public sealed class WinDropTray
         UpdateTrayFlyout();
         flyout.Opacity = rendering ? 1 : 0;
         flyout.Show();
+        // Wrapped status messages change the height. Position only after WPF has measured them.
+        flyout.UpdateLayout();
         if (!rendering)
         {
             var cursor = Forms.Cursor.Position;
@@ -309,10 +377,12 @@ public sealed class WinDropTray
             }
         }
         flyout.Opacity = 1;
+        AnimateEntrance(flyout.FindName("FlyoutSurface") as FrameworkElement, 12, 240);
         flyout.Activate();
     }
     void UpdateTrayFlyout()
     {
+        UpdateTrayIcon();
         if (flyout == null) return;
         var status = FindFlyout<TextBlock>("FlyoutStatusText"); if (status != null) status.Text = Find<TextBlock>("StatusText").Text;
         var detail = FindFlyout<TextBlock>("FlyoutStatusDetail"); if (detail != null) detail.Text = Find<TextBlock>("StatusDetail").Text;
@@ -326,12 +396,25 @@ public sealed class WinDropTray
     void UpdateCount() { Find<TextBlock>("CountText").Text = items.Count + (items.Count == 1 ? " item" : " items"); Find<StackPanel>("EmptyState").Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; UpdateTrayFlyout(); }
     void SetStatus(string title, string detail, bool ready)
     {
+        receiverReady = ready;
         Find<TextBlock>("StatusText").Text = title; Find<TextBlock>("StatusDetail").Text = detail;
-        Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#EE725D" : "#A7988F"));
+        Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#F39485" : "#737780"));
         Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving";
         Find<Button>("ReceiveButton").IsEnabled = !busy;
         if (!rendering) tray.Text = "SwooshDrop · " + title.Substring(0, Math.Min(48, title.Length));
         UpdateTrayFlyout();
+    }
+    static System.Drawing.Icon LoadTrayIcon(string resource)
+    {
+        using (var stream = new MemoryStream(ResourceBytes(resource)))
+        using (var icon = new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize))
+            return (System.Drawing.Icon)icon.Clone();
+    }
+    void UpdateTrayIcon()
+    {
+        if (rendering || activeTrayIcon == null || pausedTrayIcon == null) return;
+        var icon = ownsSession && receiverReady && !busy ? activeTrayIcon : pausedTrayIcon;
+        if (!ReferenceEquals(tray.Icon, icon)) tray.Icon = icon;
     }
     void OnUi(Action action) { if (!quitting) window.Dispatcher.BeginInvoke(action); }
     void Log(string text)
@@ -563,12 +646,13 @@ public sealed class WinDropTray
     {
         if (incoming == null || popup != null) return;
         popup = (Window)XamlReader.Parse(ResourceText("TransferPopup.xaml"));
+        ApplyBrand(popup);
         popup.Closed += delegate(object sender, EventArgs e) { if (ReferenceEquals(popup, sender)) popup = null; if (incoming != null) Decide(false); };
         ((TextBlock)popup.FindName("SenderText")).Text = Convert.ToString(incoming["sender"]) + " wants to share";
         string[] links = Strings(incoming, "links"), files = Strings(incoming, "files");
         ((TextBlock)popup.FindName("FilesText")).Text = links.Length > 0 ? (links.Length == 1 ? "Web link" : links.Length + " web links") : string.Join(", ", files);
         if (!string.IsNullOrEmpty(incomingPreview)) ((System.Windows.Controls.Image)popup.FindName("PreviewImage")).Source = ImageFile(incomingPreview);
-        if (links.Length > 0) { var link = (TextBox)popup.FindName("LinkText"); link.Text = string.Join("\n\n", links); link.Visibility = Visibility.Visible; ((TextBlock)popup.FindName("PreviewGlyph")).Visibility = Visibility.Collapsed; }
+        if (links.Length > 0) { var link = (TextBox)popup.FindName("LinkText"); link.Text = string.Join("\n\n", links); link.Visibility = Visibility.Visible; ((UIElement)popup.FindName("PreviewGlyph")).Visibility = Visibility.Collapsed; }
         ((Button)popup.FindName("AcceptButton")).Click += delegate { Decide(true); };
         ((Button)popup.FindName("DeclineButton")).Click += delegate { Decide(false); };
         popup.Opacity = rendering ? 1 : 0;
@@ -589,6 +673,7 @@ public sealed class WinDropTray
             }
         }
         popup.Opacity = 1;
+        AnimateEntrance(popup.FindName("PopupSurface") as FrameworkElement, 12, 240);
     }
     void Decide(bool accepted)
     {
