@@ -25,7 +25,7 @@
 .\Build-WinDrop.ps1 -BackendDirectory '<包含 windrop.dll 的目錄>'
 ```
 
-完整安裝器仍依上游流程，需要準備 runtime payload 與 corresponding-source archive；請參閱 [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md)。
+精簡安裝器需要準備 runtime payload；corresponding-source archive 會獨立放在同一個 GitHub Release，不再嵌入 EXE。請參閱 [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md)。
 
 ## 尚未承諾的功能
 

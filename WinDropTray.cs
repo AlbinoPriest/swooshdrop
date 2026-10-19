@@ -28,8 +28,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.6.1")]
-[assembly: AssemblyFileVersion("0.3.6.1")]
+[assembly: AssemblyVersion("0.3.6.2")]
+[assembly: AssemblyFileVersion("0.3.6.2")]
 
 public class TransferItem : INotifyPropertyChanged
 {

@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlbinoPriest/swooshdrop/releases/download/v0.3.6/SwooshDropSetup.exe"><strong>Download the Windows beta ↗</strong></a>
+  <a href="https://github.com/KuiDaXElaina/SwooshDrop/releases/tag/v0.3.6-custom.2"><strong>Download the Windows beta ↗</strong></a>
   &nbsp; · &nbsp;
   <a href="docs/COMPATIBILITY.md">Check your adapter</a>
   &nbsp; · &nbsp;
@@ -66,7 +66,7 @@ Tempo Soft uses charcoal surfaces, soft coral accents, rounded controls, and edi
 ## Get your first drop
 
 1. **Check your hardware.** Use a compatible dedicated USB Wi-Fi adapter, with Ethernet or a separate adapter for internet access.
-2. **[Download the beta](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.6)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
+2. **[Download the custom beta](https://github.com/KuiDaXElaina/SwooshDrop/releases/tag/v0.3.6-custom.2)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
 3. **Start receiving.** On your iPhone, turn on Wi-Fi and Bluetooth and choose AirDrop’s **Everyone for 10 Minutes** option.
 4. **Share → AirDrop → SwooshDrop.** Check the preview and press **Accept** on your PC.
 
@@ -103,6 +103,6 @@ Found a bug? [Open an issue](https://github.com/AlbinoPriest/swooshdrop/issues) 
 
 SwooshDrop’s Windows frontend, installer, and hardware integration are developed independently by **AlbinoPriest**. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop), copyright 2026 Uvejs Gjelaj, under the MIT license. [OWL](https://github.com/seemoo-lab/owl) provides AWDL under GPL-3.0. Original copyright and license notices are retained.
 
-Our [MIT license](LICENSE) covers our original work; bundled components retain their own licenses. Setup includes OWL, GPL kernel/driver modules, firmware, notices, and corresponding sources, installed under `Sources`. See [component notices](THIRD-PARTY-NOTICES.md) and [pinned revisions](source-versions.json).
+Our [MIT license](LICENSE) covers our original work; bundled components retain their own licenses. Setup includes OWL, GPL kernel/driver modules, firmware, notices, and an exact source offer installed under `Sources`. The corresponding source archive is published separately on the same release page. See [component notices](THIRD-PARTY-NOTICES.md) and [pinned revisions](source-versions.json).
 
 **Unofficial community project.** SwooshDrop is not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. AirDrop, iPhone, and Windows are third-party product names used to describe compatibility.

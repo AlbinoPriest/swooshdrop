@@ -1,0 +1,13 @@
+SwooshDrop custom 0.3.6.2 corresponding source
+
+The complete Windows frontend and packaging source for this build is available at:
+https://github.com/KuiDaXElaina/SwooshDrop/tree/v0.3.6-custom.2
+
+The corresponding source archive for the bundled OWL, Linux kernel modules,
+RTL8188EU driver changes, WinDrop protocol patch, build scripts, configuration,
+and retained license texts is published with the same release at:
+https://github.com/KuiDaXElaina/SwooshDrop/releases/tag/v0.3.6-custom.2
+
+The source archive is distributed as a separate release asset instead of being
+embedded in the Windows setup executable. It is available at no charge from the
+same release page as the installer.
