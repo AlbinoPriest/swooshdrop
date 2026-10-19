@@ -71,13 +71,14 @@ public sealed class WinDropTray
     readonly DispatcherTimer trayClickDelay = new DispatcherTimer();
     readonly DispatcherTimer logRefresh = new DispatcherTimer();
     readonly DispatcherTimer progressDismiss = new DispatcherTimer();
+    readonly DispatcherTimer transferFailureDelay = new DispatcherTimer();
     Preferences settings;
     Process receiver;
     string control, bus, token, sessionDevice;
-    bool ownsSession, busy, quitting, receivingIntent, loadingSettings, rendering;
+    bool ownsSession, busy, quitting, receivingIntent, loadingSettings, rendering, transferInProgress;
     Dictionary<string, object> incoming;
     DateTime deadline;
-    string incomingPreview, lastSender;
+    string incomingPreview, lastSender, pendingTransferFailure;
     Window popup;
     Window flyout;
     DateTime ignoreTrayClicksUntil;
@@ -254,6 +255,13 @@ public sealed class WinDropTray
         logRefresh.Tick += delegate { if (Find<UIElement>("SettingsPage").Visibility == Visibility.Visible) RefreshLogView(); };
         progressDismiss.Interval = TimeSpan.FromSeconds(2);
         progressDismiss.Tick += delegate { progressDismiss.Stop(); Find<Border>("TransferProgressCard").Visibility = Visibility.Collapsed; };
+        transferFailureDelay.Interval = TimeSpan.FromSeconds(1.5);
+        transferFailureDelay.Tick += delegate
+        {
+            transferFailureDelay.Stop();
+            string reason = pendingTransferFailure; pendingTransferFailure = null;
+            if (transferInProgress && !string.IsNullOrEmpty(reason)) RecoverFromTransferFailure(reason);
+        };
         if (!render) logRefresh.Start();
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
@@ -711,7 +719,19 @@ public sealed class WinDropTray
                 var child = new Process { StartInfo = info, EnableRaisingEvents = true }; receiver = child;
                 child.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) OnUi(delegate { if (child == receiver) HandleLine(e.Data); }); };
                 child.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) OnUi(delegate { if (child == receiver) Log(e.Data); }); };
-                child.Exited += delegate { OnUi(async delegate { if (child == receiver && ownsSession && !busy) { if (child.ExitCode == 75) ownsSession = false; else await StopReceiving(); SetStatus(I18n.Text("Connection paused"), I18n.Text("Click Start to reconnect, or wait for an automatic retry."), false); } }); };
+                child.Exited += delegate { OnUi(async delegate
+                {
+                    if (child != receiver || !ownsSession || busy) return;
+                    bool interrupted = transferInProgress;
+                    if (child.ExitCode == 75) ownsSession = false; else await StopReceiving();
+                    if (interrupted)
+                    {
+                        string reason = I18n.Text("The receiver stopped unexpectedly. SwooshDrop will retry automatically.");
+                        ShowTransferFailure(reason);
+                        SetStatus(I18n.Text("Connection paused"), reason, false);
+                    }
+                    else SetStatus(I18n.Text("Connection paused"), I18n.Text("Click Start to reconnect, or wait for an automatic retry."), false);
+                }); };
                 child.Start(); child.StandardInput.AutoFlush = true; child.BeginOutputReadLine(); child.BeginErrorReadLine();
             });
         }
@@ -723,7 +743,7 @@ public sealed class WinDropTray
     async Task StopReceiving()
     {
         if (busy || !ownsSession) return;
-        busy = true; Decide(false); SetStatus(I18n.Text("Stopping…"), I18n.Text("Returning the adapter to Windows."), false);
+        busy = true; Decide(false); ClearTransferPresentation(true); SetStatus(I18n.Text("Stopping…"), I18n.Text("Returning the adapter to Windows."), false);
         try
         {
             await Task.Run(delegate
@@ -757,7 +777,12 @@ public sealed class WinDropTray
         {
             var item = json.Deserialize<Dictionary<string, object>>(line); string kind = Convert.ToString(item["kind"]);
             if (kind == "ready") SetStatus(I18n.Text("Ready to receive"), I18n.Format("On iPhone: Share → AirDrop → {0}. Discovery may take a moment.", settings.DeviceName), true);
-            else if (kind == "log") Log(Convert.ToString(item["message"]));
+            else if (kind == "log")
+            {
+                string message = Convert.ToString(item["message"]); Log(message);
+                string reason;
+                if (transferInProgress && TransferFailurePolicy.TryDescribe(message, out reason)) QueueTransferFailure(I18n.Text(reason));
+            }
             else if (kind == "consent") ReceiveConsent(item);
             else if (kind == "progress") UpdateTransferProgress(item);
             else if (kind == "completed") Complete(item);
@@ -769,6 +794,7 @@ public sealed class WinDropTray
     void ReceiveConsent(Dictionary<string, object> item)
     {
         if (incoming != null) Decide(false);
+        if (!transferInProgress) HideTransferCard();
         incoming = item; deadline = DateTime.UtcNow.AddSeconds(55); lastSender = Convert.ToString(item["sender"]); incomingPreview = null;
         object preview; if (item.TryGetValue("preview", out preview) && preview is string) incomingPreview = SavePreview((string)preview, Convert.ToString(item["id"]));
         string[] links = Strings(item, "links"), files = Strings(item, "files");
@@ -836,6 +862,7 @@ public sealed class WinDropTray
 
     void UpdateTransferProgress(Dictionary<string, object> item)
     {
+        CancelPendingTransferFailure();
         string sender = Convert.ToString(item["sender"]), file = Convert.ToString(item["file"]);
         int index = Convert.ToInt32(item["index"]), count = Convert.ToInt32(item["count"]);
         long received = Convert.ToInt64(item["received"]), total = Convert.ToInt64(item["total"]);
@@ -845,17 +872,82 @@ public sealed class WinDropTray
 
     void ShowTransferProgress(string sender, string file, int index, int count, long received, long total, bool preparing)
     {
+        transferInProgress = true;
         progressDismiss.Stop();
-        Find<Border>("TransferProgressCard").Visibility = Visibility.Visible;
+        progressDismiss.Interval = TimeSpan.FromSeconds(2);
+        var card = Find<Border>("TransferProgressCard");
+        card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x76, 0x53, 0x4A));
+        card.Visibility = Visibility.Visible;
         Find<TextBlock>("TransferProgressTitle").Text = I18n.Format("Receiving from {0}", string.IsNullOrWhiteSpace(sender) ? "AirDrop" : sender);
         Find<TextBlock>("TransferProgressFileName").Text = file ?? "";
         var bar = Find<ProgressBar>("TransferProgressBar");
+        bar.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEE, 0x72, 0x5D));
         bar.IsIndeterminate = preparing || total <= 0;
         double percent = total <= 0 ? 0 : Math.Min(100, received * 100.0 / total);
         bar.Value = percent;
         Find<TextBlock>("TransferProgressDetail").Text = preparing
             ? I18n.Text("Preparing transfer…")
             : I18n.Format("File {0} of {1} · {2}% · {3} / {4}", Math.Max(1, index), Math.Max(1, count), percent.ToString("0", I18n.Culture), FormatBytes(received), FormatBytes(total));
+    }
+
+    void RecoverFromTransferFailure(string reason)
+    {
+        CancelPendingTransferFailure();
+        Log("Transfer recovery: " + reason);
+        ClearPendingRequest();
+        ShowTransferFailure(reason);
+        SetStatus(I18n.Text("Ready to receive again"), I18n.Format("The last transfer stopped: {0} SwooshDrop is still receiving.", reason), true);
+    }
+
+    void QueueTransferFailure(string reason)
+    {
+        pendingTransferFailure = reason;
+        transferFailureDelay.Stop(); transferFailureDelay.Start();
+    }
+
+    void CancelPendingTransferFailure()
+    {
+        transferFailureDelay.Stop(); pendingTransferFailure = null;
+    }
+
+    void ShowTransferFailure(string reason)
+    {
+        transferInProgress = false;
+        var card = Find<Border>("TransferProgressCard");
+        card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD8, 0x66, 0x66));
+        card.Visibility = Visibility.Visible;
+        Find<TextBlock>("TransferProgressTitle").Text = I18n.Text("Transfer interrupted");
+        var bar = Find<ProgressBar>("TransferProgressBar");
+        bar.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD8, 0x66, 0x66));
+        bar.IsIndeterminate = false; bar.Value = 0;
+        Find<TextBlock>("TransferProgressDetail").Text = reason;
+        progressDismiss.Stop(); progressDismiss.Interval = TimeSpan.FromSeconds(10); progressDismiss.Start();
+    }
+
+    void ClearPendingRequest()
+    {
+        incoming = null;
+        if (popup != null) { Window stale = popup; popup = null; stale.Close(); }
+        Find<Border>("PendingBanner").Visibility = Visibility.Collapsed;
+        if (!string.IsNullOrEmpty(incomingPreview))
+        {
+            try { if (File.Exists(incomingPreview)) File.Delete(incomingPreview); }
+            catch (Exception ex) { Log("Preview cleanup: " + ex.Message); }
+            incomingPreview = null;
+        }
+    }
+
+    void ClearTransferPresentation(bool clearPreview)
+    {
+        CancelPendingTransferFailure();
+        transferInProgress = false;
+        progressDismiss.Stop(); HideTransferCard();
+        if (clearPreview) ClearPendingRequest();
+    }
+
+    void HideTransferCard()
+    {
+        Find<Border>("TransferProgressCard").Visibility = Visibility.Collapsed;
     }
 
     static string FormatBytes(long bytes)
@@ -868,6 +960,8 @@ public sealed class WinDropTray
 
     void Complete(Dictionary<string, object> eventItem)
     {
+        CancelPendingTransferFailure();
+        transferInProgress = false;
         string[] files = Strings(eventItem, "files"), links = Strings(eventItem, "links");
         var added = new List<TransferItem>();
         foreach (string linux in files)
@@ -884,7 +978,7 @@ public sealed class WinDropTray
         SaveHistory(); UpdateCount(); SetStatus(I18n.Text("Ready for your next drop"), I18n.Format("Saved to {0}", settings.SaveFolder), true);
         var progress = Find<ProgressBar>("TransferProgressBar"); progress.IsIndeterminate = false; progress.Value = 100;
         Find<TextBlock>("TransferProgressDetail").Text = I18n.Text("Transfer complete");
-        progressDismiss.Stop(); progressDismiss.Start();
+        progressDismiss.Stop(); progressDismiss.Interval = TimeSpan.FromSeconds(2); progressDismiss.Start();
         Notify(I18n.Text(links.Length > 0 ? "Link received" : "AirDrop received"), links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), incomingPreview, null, null);
         incomingPreview = null; QueueMissingPreviews();
         if (settings.OpenLinksOnReceive && added.Count > 0)

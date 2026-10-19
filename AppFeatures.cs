@@ -77,6 +77,40 @@ public static class SettingsPolicy
     }
 }
 
+public static class TransferFailurePolicy
+{
+    const string Prefix = "Connection failed:";
+
+    public static bool TryDescribe(string message, out string reason)
+    {
+        reason = null;
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        int marker = message.IndexOf(Prefix, StringComparison.OrdinalIgnoreCase);
+        if (marker < 0) return false;
+
+        string detail = message.Substring(marker + Prefix.Length).Trim();
+        if (Contains(detail, "unexpected EOF") ||
+            Contains(detail, "closed before a chunk header") ||
+            Contains(detail, "connection closed by peer") ||
+            Contains(detail, "forcibly closed") ||
+            Contains(detail, "connection reset") ||
+            Contains(detail, "socket error 104"))
+            reason = "The iPhone or wireless link closed the connection.";
+        else if (Contains(detail, "timed out") || Contains(detail, "timeout"))
+            reason = "The transfer stopped because no data arrived in time.";
+        else if (Contains(detail, "canceled") || Contains(detail, "cancelled"))
+            reason = "The transfer was canceled before it finished.";
+        else
+            reason = "The connection ended unexpectedly. Open Diagnostics for technical details.";
+        return true;
+    }
+
+    static bool Contains(string value, string fragment)
+    {
+        return value.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+}
+
 public static class I18n
 {
     static string language = "en-US";
@@ -194,6 +228,14 @@ public static class I18n
         { "Preparing transfer…", "正在準備傳輸…" },
         { "File {0} of {1} · {2}% · {3} / {4}", "第 {0}/{1} 個檔案 · {2}% · {3} / {4}" },
         { "Transfer complete", "傳輸完成" },
+        { "Transfer interrupted", "傳輸已中斷" },
+        { "Ready to receive again", "已恢復接收" },
+        { "The last transfer stopped: {0} SwooshDrop is still receiving.", "上一次傳輸已停止：{0} SwooshDrop 已自動恢復接收。" },
+        { "The iPhone or wireless link closed the connection.", "iPhone 或無線連線中途斷開。" },
+        { "The transfer stopped because no data arrived in time.", "因等待資料逾時，傳輸已停止。" },
+        { "The transfer was canceled before it finished.", "傳輸在完成前被取消。" },
+        { "The connection ended unexpectedly. Open Diagnostics for technical details.", "連線意外結束；可開啟「連線診斷」查看技術細節。" },
+        { "The receiver stopped unexpectedly. SwooshDrop will retry automatically.", "接收服務意外停止；SwooshDrop 將自動重試。" },
         { "Ready for your next drop", "等待下一次傳輸" },
         { "Link received", "已收到連結" },
         { "AirDrop received", "已收到 AirDrop" },
