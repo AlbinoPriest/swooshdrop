@@ -7,7 +7,9 @@ destination=${3:-$out/received}
 vendor=${5:-0bda}
 product=${6:-8179}
 serial=${7:-}
+device_name=${8:-SwooshDrop}
 [[ "$vendor" =~ ^[0-9a-f]{4}$ && "$product" =~ ^[0-9a-f]{4}$ ]] || { echo 'Invalid adapter identity'; exit 2; }
+[[ -n "${device_name//[[:space:]]/}" && ${#device_name} -le 63 && "$device_name" != *$'\n'* && "$device_name" != *$'\r'* ]] || { echo 'Invalid AirDrop device name'; exit 2; }
 adapter_matches() {
     local dev=$1
     [[ -f "$dev/idVendor" && -f "$dev/idProduct" ]] || return 1
@@ -144,8 +146,8 @@ for pass in {1..50}; do
     sleep 0.2
 done
 if [[ "${2:-}" == --ui-events ]]; then
-    dotnet "$out/windrop.dll" receive --bridge ::1 --name 'SwooshDrop' --dir "$destination" --ui-events --preview-decoder "$out/render-preview.py" 2>&1 | tee "$out/logs/receiver.log"
+    dotnet "$out/windrop.dll" receive --bridge ::1 --name "$device_name" --dir "$destination" --ui-events --preview-decoder "$out/render-preview.py" 2>&1 | tee "$out/logs/receiver.log"
 else
     echo 'Starting receiver. Transfers require approval. This test session stops after 15 minutes.'
-    timeout --foreground 15m dotnet "$lab/windrop/src/WinDrop.Cli/bin/Release/net8.0/windrop.dll" receive --bridge ::1 --name 'SwooshDrop' --dir "$out/received" 2>&1 | tee "$out/logs/receiver.log"
+    timeout --foreground 15m dotnet "$lab/windrop/src/WinDrop.Cli/bin/Release/net8.0/windrop.dll" receive --bridge ::1 --name "$device_name" --dir "$out/received" 2>&1 | tee "$out/logs/receiver.log"
 fi
