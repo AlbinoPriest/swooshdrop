@@ -22,10 +22,12 @@ cmake -S "$lab/owl" -B "$lab/owl/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$lab/owl/build" -j 4
 
 checkout "$lab/windrop" https://github.com/UvejsGj/WinDrop.git 5a5dc52ce6eda298789622cb92d548d64d5673cc
-if ! git -C "$lab/windrop" apply --reverse --check "$repo/patches/prototype-changes.patch" 2>/dev/null; then
-    git -C "$lab/windrop" apply --check "$repo/patches/prototype-changes.patch"
-    git -C "$lab/windrop" apply "$repo/patches/prototype-changes.patch"
-fi
+for patch in "$repo/patches/prototype-changes.patch" "$repo/patches/live-transfer-progress.patch"; do
+    if ! git -C "$lab/windrop" apply --reverse --check "$patch" 2>/dev/null; then
+        git -C "$lab/windrop" apply --check "$patch"
+        git -C "$lab/windrop" apply "$patch"
+    fi
+done
 dotnet build "$lab/windrop/src/WinDrop.Cli/WinDrop.Cli.csproj" -c Release -o "$lab/receiver-product"
 mkdir -p "$lab/receiver-refresh"
 cp "$lab/receiver-product/"* "$lab/receiver-refresh/"

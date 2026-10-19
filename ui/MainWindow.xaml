@@ -217,15 +217,33 @@
        <TextBlock Text="RECENTLY RECEIVED" Foreground="#B2B0B0" FontSize="11" FontWeight="Medium"/>
       <TextBlock x:Name="CountText" Text="0 items" HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="11"/>
      </Grid>
-     <Border x:Name="PendingBanner" Grid.Row="1" Background="#393035" BorderBrush="#695056" BorderThickness="1"
-             CornerRadius="10" Padding="14" Visibility="Collapsed" Margin="0,0,0,15">
-      <Grid>
-       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-       <TextBlock x:Name="PendingText" Text="Incoming AirDrop" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#F1EDE8"/>
-       <Button x:Name="BannerDecline" Grid.Column="1" Content="Decline" Margin="10,0,8,0" Padding="12,7"/>
-       <Button x:Name="BannerAccept" Grid.Column="2" Content="Accept" Background="#F39485" Foreground="#241B1B" BorderThickness="0" Padding="12,7"/>
-      </Grid>
-     </Border>
+     <StackPanel Grid.Row="1">
+      <Border x:Name="PendingBanner" Background="#393035" BorderBrush="#695056" BorderThickness="1"
+              CornerRadius="10" Padding="14" Visibility="Collapsed" Margin="0,0,0,15">
+       <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="PendingText" Text="Incoming AirDrop" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#F1EDE8"/>
+        <Button x:Name="BannerDecline" Grid.Column="1" Content="Decline" Margin="10,0,8,0" Padding="12,7"/>
+        <Button x:Name="BannerAccept" Grid.Column="2" Content="Accept" Background="#F39485" Foreground="#241B1B" BorderThickness="0" Padding="12,7"/>
+       </Grid>
+      </Border>
+      <Border x:Name="TransferProgressCard" Background="#202328" BorderBrush="#363A41" BorderThickness="1"
+              CornerRadius="18" Padding="15" Visibility="Collapsed" Margin="0,0,0,15">
+       <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Width="32" Height="32" CornerRadius="16" Background="#292D33" VerticalAlignment="Top">
+         <TextBlock Text="↓" Foreground="#F39485" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+        </Border>
+        <StackPanel Grid.Column="1">
+         <TextBlock x:Name="TransferProgressTitle" Text="Receiving from iPhone" FontSize="13" FontWeight="SemiBold" Foreground="#F1EDE8"/>
+         <TextBlock x:Name="TransferProgressFileName" Text="photo.heic" FontSize="11" Foreground="#B2B0B0" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+         <ProgressBar x:Name="TransferProgressBar" Height="6" Minimum="0" Maximum="100" Value="0" IsIndeterminate="True"
+                      Foreground="#F39485" Background="#363A41" BorderThickness="0" Margin="0,10,0,0"/>
+         <TextBlock x:Name="TransferProgressDetail" Text="Preparing transfer…" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
+        </StackPanel>
+       </Grid>
+      </Border>
+     </StackPanel>
      <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <Grid>
        <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,50,0,0">

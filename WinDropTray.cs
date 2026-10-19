@@ -70,6 +70,7 @@ public sealed class WinDropTray
     readonly DispatcherTimer expiry = new DispatcherTimer();
     readonly DispatcherTimer trayClickDelay = new DispatcherTimer();
     readonly DispatcherTimer logRefresh = new DispatcherTimer();
+    readonly DispatcherTimer progressDismiss = new DispatcherTimer();
     Preferences settings;
     Process receiver;
     string control, bus, token, sessionDevice;
@@ -111,6 +112,8 @@ public sealed class WinDropTray
                 {
                     string page = Option(args, "--render-page");
                     if (page == "Received" || page == "Settings" || page == "About") app.Page(page);
+                    if (Array.IndexOf(args, "--render-progress") >= 0)
+                        app.ShowTransferProgress("Natsu’s iPhone", "Weekend photo.heic", 2, 3, 1572864, 3145728, false);
                     app.window.Show(); app.Render(app.window, Option(args, "--render"));
                 }
                 app.quitting = true; application.Shutdown(); return;
@@ -249,6 +252,8 @@ public sealed class WinDropTray
         Find<ComboBox>("LogSourceCombo").SelectionChanged += delegate { RefreshLogView(); };
         logRefresh.Interval = TimeSpan.FromSeconds(2);
         logRefresh.Tick += delegate { if (Find<UIElement>("SettingsPage").Visibility == Visibility.Visible) RefreshLogView(); };
+        progressDismiss.Interval = TimeSpan.FromSeconds(2);
+        progressDismiss.Tick += delegate { progressDismiss.Stop(); Find<Border>("TransferProgressCard").Visibility = Visibility.Collapsed; };
         if (!render) logRefresh.Start();
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
@@ -754,6 +759,7 @@ public sealed class WinDropTray
             if (kind == "ready") SetStatus(I18n.Text("Ready to receive"), I18n.Format("On iPhone: Share → AirDrop → {0}. Discovery may take a moment.", settings.DeviceName), true);
             else if (kind == "log") Log(Convert.ToString(item["message"]));
             else if (kind == "consent") ReceiveConsent(item);
+            else if (kind == "progress") UpdateTransferProgress(item);
             else if (kind == "completed") Complete(item);
         }
         catch (Exception ex) { Log("UI event: " + ex.Message); }
@@ -813,13 +819,53 @@ public sealed class WinDropTray
     void Decide(bool accepted)
     {
         if (incoming == null) return;
+        string sender = Convert.ToString(incoming["sender"]);
+        string[] files = Strings(incoming, "files"), links = Strings(incoming, "links");
         string id = Convert.ToString(incoming["id"]); if (DateTime.UtcNow >= deadline) accepted = false;
         try { if (receiver != null && !receiver.HasExited) receiver.StandardInput.WriteLine(json.Serialize(new { id = id, accept = accepted })); }
         catch (Exception ex) { Log("Consent: " + ex.Message); accepted = false; }
         incoming = null; if (popup != null) { popup.Close(); popup = null; }
         Find<Border>("PendingBanner").Visibility = Visibility.Collapsed;
+        if (accepted)
+        {
+            string name = links.Length > 0 ? links[0] : files.Length > 0 ? files[0] : I18n.Text("Preparing transfer…");
+            ShowTransferProgress(sender, name, 0, Math.Max(files.Length, links.Length), 0, 0, true);
+        }
         SetStatus(I18n.Text(accepted ? "Receiving your drop…" : "Ready to receive"), accepted ? I18n.Text("Saving the original files to your received folder.") : I18n.Format("On iPhone: Share → AirDrop → {0}.", settings.DeviceName), true);
     }
+
+    void UpdateTransferProgress(Dictionary<string, object> item)
+    {
+        string sender = Convert.ToString(item["sender"]), file = Convert.ToString(item["file"]);
+        int index = Convert.ToInt32(item["index"]), count = Convert.ToInt32(item["count"]);
+        long received = Convert.ToInt64(item["received"]), total = Convert.ToInt64(item["total"]);
+        lastSender = sender;
+        ShowTransferProgress(sender, file, index, count, received, total, false);
+    }
+
+    void ShowTransferProgress(string sender, string file, int index, int count, long received, long total, bool preparing)
+    {
+        progressDismiss.Stop();
+        Find<Border>("TransferProgressCard").Visibility = Visibility.Visible;
+        Find<TextBlock>("TransferProgressTitle").Text = I18n.Format("Receiving from {0}", string.IsNullOrWhiteSpace(sender) ? "AirDrop" : sender);
+        Find<TextBlock>("TransferProgressFileName").Text = file ?? "";
+        var bar = Find<ProgressBar>("TransferProgressBar");
+        bar.IsIndeterminate = preparing || total <= 0;
+        double percent = total <= 0 ? 0 : Math.Min(100, received * 100.0 / total);
+        bar.Value = percent;
+        Find<TextBlock>("TransferProgressDetail").Text = preparing
+            ? I18n.Text("Preparing transfer…")
+            : I18n.Format("File {0} of {1} · {2}% · {3} / {4}", Math.Max(1, index), Math.Max(1, count), percent.ToString("0", I18n.Culture), FormatBytes(received), FormatBytes(total));
+    }
+
+    static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1073741824) return (bytes / 1073741824.0).ToString("0.0", I18n.Culture) + " GB";
+        if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0", I18n.Culture) + " MB";
+        if (bytes >= 1024) return (bytes / 1024.0).ToString("0.0", I18n.Culture) + " KB";
+        return bytes.ToString(I18n.Culture) + " B";
+    }
+
     void Complete(Dictionary<string, object> eventItem)
     {
         string[] files = Strings(eventItem, "files"), links = Strings(eventItem, "links");
@@ -836,6 +882,9 @@ public sealed class WinDropTray
         foreach (var item in added) items.Insert(0, item);
         while (items.Count > 500) items.RemoveAt(items.Count - 1);
         SaveHistory(); UpdateCount(); SetStatus(I18n.Text("Ready for your next drop"), I18n.Format("Saved to {0}", settings.SaveFolder), true);
+        var progress = Find<ProgressBar>("TransferProgressBar"); progress.IsIndeterminate = false; progress.Value = 100;
+        Find<TextBlock>("TransferProgressDetail").Text = I18n.Text("Transfer complete");
+        progressDismiss.Stop(); progressDismiss.Start();
         Notify(I18n.Text(links.Length > 0 ? "Link received" : "AirDrop received"), links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), incomingPreview, null, null);
         incomingPreview = null; QueueMissingPreviews();
         if (settings.OpenLinksOnReceive && added.Count > 0)

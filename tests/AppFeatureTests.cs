@@ -25,6 +25,8 @@ public static class AppFeatureTests
             Assert(I18n.Format("Choose {0} on your iPhone.", "ざこ～♡").Contains("ざこ～♡"), "Localized format dropped the device name");
             Assert(I18n.Text("Restart receiving now?") == "要立即重新啟用接收嗎？", "Restart confirmation was not localized");
             Assert(I18n.Text("Applying this change now will stop any transfer currently in progress. Choose No to apply it the next time receiving starts.").Contains("中止目前進行中的傳輸"), "Restart warning omitted the active-transfer risk");
+            Assert(I18n.Format("Receiving from {0}", "Natsu’s iPhone").Contains("Natsu’s iPhone"), "Transfer progress dropped the sender name");
+            Assert(I18n.Format("File {0} of {1} · {2}% · {3} / {4}", 2, 3, 50, "1.5 MB", "3.0 MB").Contains("50%"), "Transfer progress formatting failed");
             I18n.SetLanguage("en-US");
             Assert(I18n.Text("接受") == "Accept", "Language switching did not restore English");
             Console.WriteLine("PASS: settings migration, Unicode device names, UTF-8 limit, and zh-TW/en-US localization.");

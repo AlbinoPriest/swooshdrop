@@ -1,0 +1,167 @@
+diff --git a/src/WinDrop.Cli/Program.cs b/src/WinDrop.Cli/Program.cs
+index eed26bc..8077956 100644
+--- a/src/WinDrop.Cli/Program.cs
++++ b/src/WinDrop.Cli/Program.cs
+@@ -116,6 +116,11 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+         // This timing excludes bytes buffered while waiting for consent.
+         Log = line => { if (uiEvents) EmitUi(new { kind = "log", message = line });
+                         else Console.WriteLine($"  {DateTime.Now:HH:mm:ss} {line}"); },
++        TransferProgress = uiEvents ? progress => EmitUi(new { kind = "progress",
++            sender = progress.Sender, file = progress.FileName,
++            index = progress.FileIndex, count = progress.FileCount,
++            received = progress.FileBytesReceived, total = progress.FileBytesTotal,
++            receivedTotal = progress.TotalBytesReceived }) : null,
+         TransferCompleted = uiEvents ? result => EmitUi(new { kind = "completed", files = result.Files, bytes = result.TotalBytes, links = result.Links }) : null,
+     });
+ 
+diff --git a/src/WinDrop.Protocol/AirDropReceiver.cs b/src/WinDrop.Protocol/AirDropReceiver.cs
+index e4f33fb..f7e33ef 100644
+--- a/src/WinDrop.Protocol/AirDropReceiver.cs
++++ b/src/WinDrop.Protocol/AirDropReceiver.cs
+@@ -34,6 +34,9 @@ public sealed class AirDropReceiverOptions
+     /// <summary>Called once the files are committed and the success reply is sent.</summary>
+     public Action<AirDropTransferResult>? TransferCompleted { get; init; }
+ 
++    /// <summary>Reports decompressed bytes written for the current archive member.</summary>
++    public Action<AirDropTransferProgress>? TransferProgress { get; init; }
++
+     public const long DefaultMaxExtractedBytes = 8L * 1024 * 1024 * 1024;
+ 
+     /// <summary>The most an /Upload body may be as sent, before decompression.</summary>
+@@ -68,6 +71,15 @@ public sealed class AirDropReceiverOptions
+ 
+ public sealed record AirDropTransferResult(IReadOnlyList<string> Files, long TotalBytes, IReadOnlyList<string>? Links = null);
+ 
++public sealed record AirDropTransferProgress(
++    string Sender,
++    string FileName,
++    int FileIndex,
++    int FileCount,
++    long FileBytesReceived,
++    long FileBytesTotal,
++    long TotalBytesReceived);
++
+ /// <summary>
+ /// The receiving half of AirDrop: /Discover, /Ask and /Upload over one TLS connection.
+ ///
+@@ -453,6 +465,8 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+         var committed = new List<string>();
+         string staging = Path.Combine(options.DownloadDirectory, $".windrop-incoming-{Guid.NewGuid():N}");
+         long declared = 0;
++        long received = 0;
++        int fileIndex = 0;
+         bool complete = false;
+ 
+         try
+@@ -505,13 +519,36 @@ public sealed class AirDropReceiver(AirDropReceiverOptions options)
+                 if (!Directory.Exists(staging)) CreateStagingDirectory(staging);
+ 
+                 string stagedPath = Path.Combine(staging, staged.Count.ToString(CultureInfo.InvariantCulture));
++                fileIndex++;
++                int fileCount = Math.Max(consented?.Files.Count ?? 0, fileIndex);
++                string sender = consented?.SenderComputerName ?? "Unknown";
++                string displayName = Path.GetFileName(entry.Name);
++                long completedBeforeFile = received;
++                long lastReportAt = 0;
++                Action<long>? report = null;
++                if (options.TransferProgress is not null)
++                {
++                    options.TransferProgress(new AirDropTransferProgress(
++                        sender, displayName, fileIndex, fileCount, 0, entry.Size, completedBeforeFile));
++                    report = copied =>
++                    {
++                        long now = Stopwatch.GetTimestamp();
++                        if (copied < entry.Size && lastReportAt != 0
++                            && Stopwatch.GetElapsedTime(lastReportAt, now) < TimeSpan.FromMilliseconds(150)) return;
++                        lastReportAt = now;
++                        options.TransferProgress(new AirDropTransferProgress(
++                            sender, displayName, fileIndex, fileCount,
++                            copied, entry.Size, completedBeforeFile + copied));
++                    };
++                }
+ 
+                 await using (var file = new FileStream(
+                     stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+                 {
+-                    await reader.CopyContentToAsync(file, ct);
++                    await reader.CopyContentToAsync(file, ct, report);
+                 }
+ 
++                received += entry.Size;
+                 staged.Add(new StagedMember(entry.Name, destination, stagedPath, entry.Size));
+             }
+ 
+diff --git a/src/WinDrop.Protocol/Archive/CpioNewc.cs b/src/WinDrop.Protocol/Archive/CpioNewc.cs
+index 34aca20..b38b026 100644
+--- a/src/WinDrop.Protocol/Archive/CpioNewc.cs
++++ b/src/WinDrop.Protocol/Archive/CpioNewc.cs
+@@ -308,7 +308,10 @@ public sealed class CpioReader(Stream input)
+     /// Streams the current member's content into <paramref name="destination"/> through one
+     /// small buffer, however large the member claims to be. Returns the bytes copied.
+     /// </summary>
+-    public async Task<long> CopyContentToAsync(Stream destination, CancellationToken ct = default)
++    public async Task<long> CopyContentToAsync(
++        Stream destination,
++        CancellationToken ct = default,
++        Action<long>? progress = null)
+     {
+         long copied = 0;
+ 
+@@ -324,6 +327,7 @@ public sealed class CpioReader(Stream input)
+ 
+             _entryRemaining -= read;
+             copied += read;
++            progress?.Invoke(copied);
+         }
+ 
+         return copied;
+diff --git a/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs b/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
+index 846ab09..beb15d2 100644
+--- a/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
++++ b/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
+@@ -49,7 +49,8 @@ public class AirDropFlowTests : IDisposable
+         Action<string>? log = null,
+         bool earlyAsk = false,
+         long maxExtractedBytes = AirDropReceiverOptions.DefaultMaxExtractedBytes,
+-        Action<AirDropTransferResult>? completed = null)
++        Action<AirDropTransferResult>? completed = null,
++        Action<AirDropTransferProgress>? progress = null)
+     {
+         var receiver = new AirDropReceiver(new AirDropReceiverOptions
+         {
+@@ -60,6 +61,7 @@ public class AirDropFlowTests : IDisposable
+             EarlyAskReply = earlyAsk,
+             MaxExtractedBytes = maxExtractedBytes,
+             TransferCompleted = completed,
++            TransferProgress = progress,
+         });
+ 
+         X509Certificate2 serverCert = AirDropCertificate.CreateSelfSigned("WinDrop-Receiver");
+@@ -108,12 +110,13 @@ public class AirDropFlowTests : IDisposable
+     {
+         AirDropAskRequest? seen = null;
+         var committed = new TaskCompletionSource<AirDropTransferResult>(TaskCreationOptions.RunContinuationsAsynchronously);
++        var progress = new List<AirDropTransferProgress>();
+ 
+         Harness h = await StartAsync((request, _) =>
+         {
+             seen = request;
+             return Task.FromResult(true);
+-        }, completed: result => committed.SetResult(result));
++        }, completed: result => committed.SetResult(result), progress: progress.Add);
+ 
+         try
+         {
+@@ -137,6 +140,12 @@ public class AirDropFlowTests : IDisposable
+             AirDropTransferResult saved = await committed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+             Assert.Equal(2, saved.Files.Count);
+             Assert.True(File.Exists(saved.Files[0]));
++            Assert.NotEmpty(progress);
++            Assert.Contains(progress, update => update.Sender == "Sender PC"
++                && update.FileName == "photo.jpg" && update.FileBytesReceived == 5001
++                && update.FileBytesTotal == 5001 && update.FileIndex == 1 && update.FileCount == 2);
++            Assert.Equal(progress.OrderBy(update => update.TotalBytesReceived).Select(update => update.TotalBytesReceived),
++                progress.Select(update => update.TotalBytesReceived));
+         }
+         finally
+         {
