@@ -28,8 +28,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.6.0")]
-[assembly: AssemblyFileVersion("0.3.6.0")]
+[assembly: AssemblyVersion("0.3.6.1")]
+[assembly: AssemblyFileVersion("0.3.6.1")]
 
 public class TransferItem : INotifyPropertyChanged
 {
@@ -876,12 +876,12 @@ public sealed class WinDropTray
         progressDismiss.Stop();
         progressDismiss.Interval = TimeSpan.FromSeconds(2);
         var card = Find<Border>("TransferProgressCard");
-        card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x76, 0x53, 0x4A));
+        card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x36, 0x3A, 0x41));
         card.Visibility = Visibility.Visible;
         Find<TextBlock>("TransferProgressTitle").Text = I18n.Format("Receiving from {0}", string.IsNullOrWhiteSpace(sender) ? "AirDrop" : sender);
         Find<TextBlock>("TransferProgressFileName").Text = file ?? "";
         var bar = Find<ProgressBar>("TransferProgressBar");
-        bar.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEE, 0x72, 0x5D));
+        bar.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF3, 0x94, 0x85));
         bar.IsIndeterminate = preparing || total <= 0;
         double percent = total <= 0 ? 0 : Math.Min(100, received * 100.0 / total);
         bar.Value = percent;

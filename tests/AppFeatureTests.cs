@@ -22,6 +22,8 @@ public static class AppFeatureTests
             Assert(old.DeviceName == "SwooshDrop" && old.RuntimeDistro == "WinDropRuntime", "Legacy defaults were not restored");
             I18n.SetLanguage("zh-TW");
             Assert(I18n.Text("Accept") == "接受", "Traditional Chinese translation failed");
+            Assert(I18n.Text("Your latest arrivals.") == "你最近收到的項目。", "Tempo Soft title was not localized");
+            Assert(I18n.Text("Photos, files and links. Right here.") == "照片、檔案與連結，都在這裡。", "Tempo Soft subtitle was not localized");
             Assert(I18n.Format("Choose {0} on your iPhone.", "ざこ～♡").Contains("ざこ～♡"), "Localized format dropped the device name");
             Assert(I18n.Text("Restart receiving now?") == "要立即重新啟用接收嗎？", "Restart confirmation was not localized");
             Assert(I18n.Text("Applying this change now will stop any transfer currently in progress. Choose No to apply it the next time receiving starts.").Contains("中止目前進行中的傳輸"), "Restart warning omitted the active-transfer risk");

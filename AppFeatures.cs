@@ -124,6 +124,8 @@ public static class I18n
         { "Choose {0} in your iPhone’s AirDrop menu.", "請在 iPhone 的 AirDrop 選單中選擇 {0}。" },
         { "Send it. Got it.", "傳送，即刻收到。" },
         { "A direct route from your iPhone to this PC.", "從 iPhone 直接傳到這台電腦。" },
+        { "Your latest arrivals.", "你最近收到的項目。" },
+        { "Photos, files and links. Right here.", "照片、檔案與連結，都在這裡。" },
         { "Make it yours.", "依你的方式設定。" },
         { "Choose how SwooshDrop runs and where files go.", "設定 SwooshDrop 的運作方式與檔案位置。" },
         { "About SwooshDrop.", "關於 SwooshDrop。" },

@@ -299,7 +299,7 @@
           </StackPanel>
           <StackPanel Grid.Column="2">
            <TextBlock Text="AirDrop device name" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5"/>
-           <TextBox x:Name="DeviceNameInput" Height="34" MaxLength="63" Padding="10,6" Background="#423935" Foreground="#F6F0E9" BorderBrush="#6C5A53" CaretBrush="#EE725D"/>
+           <TextBox x:Name="DeviceNameInput" Height="34" MaxLength="63" Padding="10,6" Background="#292D33" Foreground="#F1EDE8" BorderBrush="#363A41" CaretBrush="#F39485"/>
           </StackPanel>
          </Grid>
          <TextBlock Text="Shown in the AirDrop menu on nearby iPhones." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,9,0,8"/>
@@ -342,7 +342,7 @@
        <StackPanel>
         <TextBlock Text="Files &amp; adapter" FontFamily="Georgia" FontSize="20"/>
          <TextBlock Text="Save received files to" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,5"/>
-         <TextBox x:Name="SaveFolderInput" Height="34" Padding="10,6" Margin="0,0,0,12" Background="#423935" Foreground="#F6F0E9" BorderBrush="#6C5A53" CaretBrush="#EE725D"/>
+         <TextBox x:Name="SaveFolderInput" Height="34" Padding="10,6" Margin="0,0,0,12" Background="#292D33" Foreground="#F1EDE8" BorderBrush="#363A41" CaretBrush="#F39485"/>
         <StackPanel Orientation="Horizontal">
          <Button x:Name="ChangeFolderButton" Content="Choose folder…"/>
           <Button x:Name="ApplyFolderButton" Content="Apply folder" Margin="9,0,0,0"/>

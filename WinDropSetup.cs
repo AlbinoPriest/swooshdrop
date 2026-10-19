@@ -18,8 +18,8 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 
 [assembly: AssemblyTitle("SwooshDrop Setup")]
-[assembly: AssemblyVersion("0.3.6.0")]
-[assembly: AssemblyFileVersion("0.3.6.0")]
+[assembly: AssemblyVersion("0.3.6.1")]
+[assembly: AssemblyFileVersion("0.3.6.1")]
 
 public sealed class SetupEngine
 {
@@ -200,7 +200,7 @@ public sealed class SetupEngine
         // Keep the old data/runtime, but retire old launch points only after the new app is installed.
         foreach (string legacy in new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "WinDrop.lnk"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "WinDrop.lnk"), Path.Combine(Home, "WinDrop.exe"), Path.Combine(Home, "WinDropSetup.exe") }) if (File.Exists(legacy)) File.Delete(legacy);
         using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\WinDrop"))
-        { key.SetValue("DisplayName", "SwooshDrop"); key.SetValue("DisplayVersion", "0.3.6"); key.SetValue("Publisher", "SwooshDrop contributors"); key.SetValue("InstallLocation", Home); key.SetValue("DisplayIcon", app); key.SetValue("UninstallString", Quote(setup) + " --uninstall"); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1); }
+        { key.SetValue("DisplayName", "SwooshDrop"); key.SetValue("DisplayVersion", "0.3.6.1"); key.SetValue("Publisher", "SwooshDrop contributors"); key.SetValue("InstallLocation", Home); key.SetValue("DisplayIcon", app); key.SetValue("UninstallString", Quote(setup) + " --uninstall"); key.SetValue("NoModify", 1); key.SetValue("NoRepair", 1); }
         Report("Installed. Open SwooshDrop, then use Share → AirDrop on your iPhone.");
     }
     public static void Uninstall()
@@ -236,7 +236,7 @@ public sealed class SetupWindow : Form
         Text = "SwooshDrop Setup"; ClientSize = new Size(760, 600); MinimumSize = MaximumSize = Size; StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(247, 249, 253); Font = new Font("Segoe UI", 10); FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
         title.Text = "AirDrop, meet your PC."; title.Font = new Font("Segoe UI", 24, FontStyle.Bold); title.SetBounds(32, 26, 700, 52);
-        subtitle.Text = "SwooshDrop · 0.3.6 beta\nReceive original photos, files, and links from your iPhone."; subtitle.SetBounds(34, 86, 690, 52);
+        subtitle.Text = "SwooshDrop · 0.3.6.1 custom\nReceive original photos, files, and links from your iPhone."; subtitle.SetBounds(34, 86, 690, 52);
         hardware.Text = "Use a dedicated USB Wi-Fi adapter. SwooshDrop reserves it while receiving.\nWindows 10/11 x64 · Internet for setup · Compatible USB required."; hardware.SetBounds(34, 157, 690, 70);
         check.Text = "1  Check prerequisites"; check.SetBounds(34, 228, 245, 42);
         adapters.SetBounds(34, 290, 690, 32); adapters.DropDownStyle = ComboBoxStyle.DropDownList;
