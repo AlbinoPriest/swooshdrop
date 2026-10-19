@@ -23,6 +23,8 @@ public static class AppFeatureTests
             I18n.SetLanguage("zh-TW");
             Assert(I18n.Text("Accept") == "接受", "Traditional Chinese translation failed");
             Assert(I18n.Format("Choose {0} on your iPhone.", "ざこ～♡").Contains("ざこ～♡"), "Localized format dropped the device name");
+            Assert(I18n.Text("Restart receiving now?") == "要立即重新啟用接收嗎？", "Restart confirmation was not localized");
+            Assert(I18n.Text("Applying this change now will stop any transfer currently in progress. Choose No to apply it the next time receiving starts.").Contains("中止目前進行中的傳輸"), "Restart warning omitted the active-transfer risk");
             I18n.SetLanguage("en-US");
             Assert(I18n.Text("接受") == "Accept", "Language switching did not restore English");
             Console.WriteLine("PASS: settings migration, Unicode device names, UTF-8 limit, and zh-TW/en-US localization.");

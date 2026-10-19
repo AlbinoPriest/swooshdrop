@@ -234,16 +234,16 @@ public sealed class WinDropTray
             settings.Language = SettingsPolicy.NormalizeLanguage(Convert.ToString(selected.Tag));
             I18n.SetLanguage(settings.Language); SaveSettings(); ApplyLanguage();
         };
-        Find<Button>("SaveDeviceNameButton").Click += delegate { SaveDeviceName(Find<TextBox>("DeviceNameInput").Text); };
-        Find<Button>("ResetDeviceNameButton").Click += delegate { Find<TextBox>("DeviceNameInput").Text = "SwooshDrop"; SaveDeviceName("SwooshDrop"); };
-        Find<Button>("ChangeFolderButton").Click += delegate
+        Find<Button>("SaveDeviceNameButton").Click += async delegate { await SaveDeviceName(Find<TextBox>("DeviceNameInput").Text); };
+        Find<Button>("ResetDeviceNameButton").Click += async delegate { Find<TextBox>("DeviceNameInput").Text = "SwooshDrop"; await SaveDeviceName("SwooshDrop"); };
+        Find<Button>("ChangeFolderButton").Click += async delegate
         {
             using (var picker = new Forms.FolderBrowserDialog { Description = I18n.Text("Choose where SwooshDrop saves received files"), SelectedPath = settings.SaveFolder })
-                if (picker.ShowDialog() == Forms.DialogResult.OK) { Find<TextBox>("SaveFolderInput").Text = picker.SelectedPath; ApplySaveFolder(picker.SelectedPath); }
+                if (picker.ShowDialog() == Forms.DialogResult.OK) { Find<TextBox>("SaveFolderInput").Text = picker.SelectedPath; await ApplySaveFolder(picker.SelectedPath); }
         };
-        Find<Button>("ApplyFolderButton").Click += delegate { ApplySaveFolder(Find<TextBox>("SaveFolderInput").Text); };
+        Find<Button>("ApplyFolderButton").Click += async delegate { await ApplySaveFolder(Find<TextBox>("SaveFolderInput").Text); };
         Find<Button>("OpenSaveFolderButton").Click += delegate { OpenFolder(); };
-        Find<Button>("ResetFolderButton").Click += delegate { string folder = SettingsPolicy.DefaultSaveFolder(); Find<TextBox>("SaveFolderInput").Text = folder; ApplySaveFolder(folder); };
+        Find<Button>("ResetFolderButton").Click += async delegate { string folder = SettingsPolicy.DefaultSaveFolder(); Find<TextBox>("SaveFolderInput").Text = folder; await ApplySaveFolder(folder); };
         Find<Button>("CopyLogsButton").Click += delegate { try { Clipboard.SetText(Find<TextBox>("LogsTextBox").Text ?? ""); } catch (Exception ex) { Log("Copy logs: " + ex.Message); } };
         Find<Button>("OpenLogsButton").Click += delegate { string folder = Path.GetDirectoryName(SelectedLogPath()); Directory.CreateDirectory(folder); Process.Start("explorer.exe", Quote(folder)); };
         Find<ComboBox>("LogSourceCombo").SelectionChanged += delegate { RefreshLogView(); };
@@ -314,7 +314,7 @@ public sealed class WinDropTray
         var empty = Find<TextBlock>("EmptyInstructionText"); if (empty != null) empty.Text = I18n.Format("Choose {0} in your iPhone’s AirDrop menu.", settings.DeviceName);
     }
 
-    void SaveDeviceName(string value)
+    async Task SaveDeviceName(string value)
     {
         string normalized, error;
         if (!SettingsPolicy.TryNormalizeDeviceName(value, out normalized, out error))
@@ -323,11 +323,14 @@ public sealed class WinDropTray
             MessageBox.Show(I18n.Text(error), "SwooshDrop", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        bool changed = !string.Equals(settings.DeviceName, normalized, StringComparison.Ordinal);
         settings.DeviceName = normalized; Find<TextBox>("DeviceNameInput").Text = normalized; SaveSettings(); RefreshDeviceInstructions();
-        Find<TextBlock>("DeviceNameStatusText").Text = I18n.Text("Device name saved.") + (ownsSession ? " " + I18n.Text("Restart receiving to advertise the new name.") : "");
+        var status = Find<TextBlock>("DeviceNameStatusText");
+        if (!changed) { status.Text = I18n.Text("Device name saved."); return; }
+        await ApplyRestartRequiredChange(status, I18n.Text("Device name saved."));
     }
 
-    void ApplySaveFolder(string value)
+    async Task ApplySaveFolder(string value)
     {
         string original = settings.SaveFolder;
         try
@@ -346,8 +349,11 @@ public sealed class WinDropTray
             string probe = Path.Combine(candidate, ".swooshdrop-write-test-" + Guid.NewGuid().ToString("N"));
             try { using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { } }
             catch (Exception ex) { throw new InvalidOperationException(I18n.Text("SwooshDrop cannot write to this folder."), ex); }
+            bool changed = !string.Equals(settings.SaveFolder, candidate, StringComparison.OrdinalIgnoreCase);
             settings.SaveFolder = candidate; Find<TextBox>("SaveFolderInput").Text = candidate; SaveSettings();
-            Find<TextBlock>("FolderStatusText").Text = I18n.Text("Save folder updated.") + (ownsSession ? " " + I18n.Text("New transfers will use this folder after receiving restarts.") : "");
+            var status = Find<TextBlock>("FolderStatusText");
+            if (!changed) { status.Text = I18n.Text("Save folder updated."); return; }
+            await ApplyRestartRequiredChange(status, I18n.Text("Save folder updated."));
         }
         catch (Exception ex)
         {
@@ -355,6 +361,36 @@ public sealed class WinDropTray
             Find<TextBlock>("FolderStatusText").Text = ex.Message;
             MessageBox.Show(ex.Message, "SwooshDrop", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    async Task ApplyRestartRequiredChange(TextBlock status, string savedMessage)
+    {
+        if (!ownsSession || busy)
+        {
+            status.Text = savedMessage + " " + I18n.Text("The new setting will be used the next time receiving starts.");
+            return;
+        }
+        var answer = MessageBox.Show(
+            I18n.Text("Applying this change now will stop any transfer currently in progress. Choose No to apply it the next time receiving starts."),
+            I18n.Text("Restart receiving now?"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            status.Text = I18n.Text("Change saved. Restart receiving to apply it.");
+            return;
+        }
+        receivingIntent = false;
+        await StopReceiving();
+        if (ownsSession)
+        {
+            receivingIntent = true;
+            status.Text = I18n.Text("Could not restart receiving. Use the main Start button to try again.");
+            return;
+        }
+        receivingIntent = true;
+        await StartReceiving();
+        status.Text = I18n.Text(ownsSession ? "Receiving restarted. The new setting is active." : "Could not restart receiving. Use the main Start button to try again.");
     }
 
     void Page(string name)
