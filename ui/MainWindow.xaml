@@ -176,7 +176,7 @@
      <Border BorderBrush="#363A41" BorderThickness="0,1,0,0" Padding="4,16,0,0">
       <StackPanel>
        <TextBlock Text="SHARE → AIRDROP" Foreground="#B2B0B0" FontSize="10"/>
-       <TextBlock Text="Choose SwooshDrop on your iPhone." Foreground="#B2B0B0" FontSize="11" Margin="0,7,0,0" TextWrapping="Wrap"/>
+       <TextBlock x:Name="SidebarInstructionText" Text="Choose SwooshDrop on your iPhone." Foreground="#B2B0B0" FontSize="11" Margin="0,7,0,0" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
     </StackPanel>
@@ -219,15 +219,33 @@
        <TextBlock Text="RECENTLY RECEIVED" Foreground="#B2B0B0" FontSize="11" FontWeight="Medium"/>
       <TextBlock x:Name="CountText" Text="0 items" HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="11"/>
      </Grid>
-     <Border x:Name="PendingBanner" Grid.Row="1" Background="#393035" BorderBrush="#695056" BorderThickness="1"
-             CornerRadius="10" Padding="14" Visibility="Collapsed" Margin="0,0,0,15">
-      <Grid>
-       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-       <TextBlock x:Name="PendingText" Text="Incoming AirDrop" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#F1EDE8"/>
-       <Button x:Name="BannerDecline" Grid.Column="1" Content="Decline" Margin="10,0,8,0" Padding="12,7"/>
-       <Button x:Name="BannerAccept" Grid.Column="2" Content="Accept" Background="#F39485" Foreground="#241B1B" BorderThickness="0" Padding="12,7"/>
-      </Grid>
-     </Border>
+     <StackPanel Grid.Row="1">
+      <Border x:Name="PendingBanner" Background="#393035" BorderBrush="#695056" BorderThickness="1"
+              CornerRadius="10" Padding="14" Visibility="Collapsed" Margin="0,0,0,15">
+       <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="PendingText" Text="Incoming AirDrop" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#F1EDE8"/>
+        <Button x:Name="BannerDecline" Grid.Column="1" Content="Decline" Margin="10,0,8,0" Padding="12,7"/>
+        <Button x:Name="BannerAccept" Grid.Column="2" Content="Accept" Background="#F39485" Foreground="#241B1B" BorderThickness="0" Padding="12,7"/>
+       </Grid>
+      </Border>
+      <Border x:Name="TransferProgressCard" Background="#202328" BorderBrush="#363A41" BorderThickness="1"
+              CornerRadius="18" Padding="15" Visibility="Collapsed" Margin="0,0,0,15">
+       <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Width="32" Height="32" CornerRadius="16" Background="#292D33" VerticalAlignment="Top">
+         <TextBlock Text="↓" Foreground="#F39485" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+        </Border>
+        <StackPanel Grid.Column="1">
+         <TextBlock x:Name="TransferProgressTitle" Text="Receiving from iPhone" FontSize="13" FontWeight="SemiBold" Foreground="#F1EDE8"/>
+         <TextBlock x:Name="TransferProgressFileName" Text="photo.heic" FontSize="11" Foreground="#B2B0B0" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+         <ProgressBar x:Name="TransferProgressBar" Height="6" Minimum="0" Maximum="100" Value="0" IsIndeterminate="True"
+                      Foreground="#F39485" Background="#363A41" BorderThickness="0" Margin="0,10,0,0"/>
+         <TextBlock x:Name="TransferProgressDetail" Text="Preparing transfer…" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
+        </StackPanel>
+       </Grid>
+      </Border>
+     </StackPanel>
      <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <Grid>
        <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,50,0,0">
@@ -235,7 +253,7 @@
          <Viewbox Width="56" Height="56" HorizontalAlignment="Center" VerticalAlignment="Center"><Canvas Width="64" Height="64"><Path Data="{DynamicResource ThroughGeometry}" Stroke="#F39485" StrokeThickness="5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas></Viewbox>
         </Border>
         <TextBlock Text="The next drop lands here." FontFamily="Georgia" FontSize="23" Margin="0,19,0,8" HorizontalAlignment="Center"/>
-        <TextBlock Text="Choose SwooshDrop in your iPhone’s AirDrop menu." Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center"/>
+        <TextBlock x:Name="EmptyInstructionText" Text="Choose SwooshDrop in your iPhone’s AirDrop menu." Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center"/>
        </StackPanel>
        <ItemsControl x:Name="Transfers">
         <ItemsControl.ItemTemplate>
@@ -256,8 +274,8 @@
              </TextBlock>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-             <Button Content="Open" Tag="{Binding}" Padding="9,6" FontSize="11" Background="Transparent" BorderThickness="0" Foreground="#F39485"/>
-             <Button Content="Show in folder" Tag="{Binding}" Padding="7,6" FontSize="10" Background="Transparent" BorderThickness="0" Foreground="#B2B0B0"/>
+             <Button Content="{Binding OpenLabel}" Tag="{Binding}" Padding="9,6" FontSize="11" Background="Transparent" BorderThickness="0" Foreground="#F39485"/>
+             <Button Content="{Binding ShowInFolderLabel}" Tag="{Binding}" Padding="7,6" FontSize="10" Background="Transparent" BorderThickness="0" Foreground="#B2B0B0"/>
             </StackPanel>
            </Grid>
           </Border>
@@ -316,7 +334,32 @@
         <TextBlock Text="Downloads open on GitHub. Updates are installed only when you choose." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="27,3,0,0"/>
        </StackPanel>
       </Border>
-      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+        <StackPanel>
+         <TextBlock Text="General" FontFamily="Georgia" FontSize="20" Margin="0,0,0,12"/>
+         <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+          <StackPanel>
+           <TextBlock Text="Display language" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5"/>
+           <ComboBox x:Name="LanguageCombo" Height="34" SelectedIndex="0">
+            <ComboBoxItem Tag="zh-TW" Content="繁體中文"/>
+            <ComboBoxItem Tag="en-US" Content="English"/>
+           </ComboBox>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+           <TextBlock Text="AirDrop device name" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5"/>
+           <TextBox x:Name="DeviceNameInput" Height="34" MaxLength="63" Padding="10,6" Background="#292D33" Foreground="#F1EDE8" BorderBrush="#363A41" CaretBrush="#F39485"/>
+          </StackPanel>
+         </Grid>
+         <TextBlock Text="Shown in the AirDrop menu on nearby iPhones." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,9,0,8"/>
+         <StackPanel Orientation="Horizontal">
+          <Button x:Name="SaveDeviceNameButton" Content="Save name"/>
+          <Button x:Name="ResetDeviceNameButton" Content="Restore default" Margin="9,0,0,0"/>
+         </StackPanel>
+         <TextBlock x:Name="DeviceNameStatusText" Text="Name changes take effect after stopping and starting receiving." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+       </Border>
+       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
         <TextBlock Text="Startup" FontFamily="Georgia" FontSize="20" Margin="0,0,0,8"/>
         <CheckBox x:Name="AutostartCheck" Content="Open SwooshDrop in the tray when I sign in"/>
@@ -347,13 +390,16 @@
       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
         <TextBlock Text="Files &amp; adapter" FontFamily="Georgia" FontSize="20"/>
-        <TextBlock Text="Save received files to" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,4"/>
-        <TextBlock x:Name="SaveFolderText" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
+         <TextBlock Text="Save received files to" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,5"/>
+         <TextBox x:Name="SaveFolderInput" Height="34" Padding="10,6" Margin="0,0,0,12" Background="#292D33" Foreground="#F1EDE8" BorderBrush="#363A41" CaretBrush="#F39485"/>
         <StackPanel Orientation="Horizontal">
          <Button x:Name="ChangeFolderButton" Content="Choose folder…"/>
-         <Button x:Name="SetupButton" Content="Adapter setup…" Margin="9,0,0,0"/>
+          <Button x:Name="ApplyFolderButton" Content="Apply folder" Margin="9,0,0,0"/>
+          <Button x:Name="OpenSaveFolderButton" Content="Open folder" Margin="9,0,0,0"/>
+          <Button x:Name="ResetFolderButton" Content="Restore default" Margin="9,0,0,0"/>
         </StackPanel>
-        <TextBlock Text="Folder changes take effect after stopping and starting receiving." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0"/>
+         <TextBlock x:Name="FolderStatusText" Text="Folder changes take effect after stopping and starting receiving." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+         <Button x:Name="SetupButton" Content="Adapter setup…" HorizontalAlignment="Left" Margin="0,14,0,0"/>
        </StackPanel>
       </Border>
       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" Margin="0,14,0,0" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">

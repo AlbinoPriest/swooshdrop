@@ -2,7 +2,7 @@
 
 SwooshDrop is an unofficial community adaptation developed independently by AlbinoPriest. It is not affiliated with, sponsored by, or endorsed by Apple, Microsoft, Uvejs Gjelaj, or the OWL maintainers. Its AirDrop protocol implementation incorporates and modifies Uvejs Gjelaj's WinDrop; the Windows frontend, installer, and hardware integration are this project's additions. These additions do not replace upstream authorship or license terms.
 
-The app embeds MIT-licensed WinDrop assemblies. Starting with 0.3, the setup EXE additionally embeds OWL, matching GPL Linux driver modules, minimal redistributable firmware, component notices, and their corresponding source archive. Setup installs the archive under `Sources` so copied installers carry the source materials.
+The app embeds MIT-licensed WinDrop assemblies. Starting with 0.3, the setup EXE additionally embeds OWL, matching GPL Linux driver modules, minimal redistributable firmware, and component notices. Custom 0.3.6.2 and later publish the corresponding source archive as a separate asset on the same GitHub release page; setup installs a source offer under `Sources` with the exact release URL.
 
 | Component | Upstream | License | Local notice |
 | --- | --- | --- | --- |

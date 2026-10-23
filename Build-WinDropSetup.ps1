@@ -9,10 +9,10 @@ $resources = @{
  'dist\SwooshDrop.exe' = 'Setup.SwooshDrop.exe'
  'obj\AppIcon.ico' = 'Setup.AppIcon.ico'
  'obj\runtime-payload.tar.gz' = 'Setup.runtime-payload.tar.gz'
- 'obj\corresponding-source.tar.gz' = 'Setup.corresponding-source.tar.gz'
  'scripts\bootstrap-runtime.sh' = 'Setup.bootstrap-runtime.sh'
  'adapters.json' = 'Setup.adapters.json'
  'THIRD-PARTY-NOTICES.md' = 'Setup.NOTICES.txt'
+ 'SOURCE-OFFER.txt' = 'Setup.SOURCE-OFFER.txt'
 }
 foreach ($file in $resources.Keys) { $path = Join-Path $PSScriptRoot $file; if (-not (Test-Path -LiteralPath $path)) { throw "Missing build input: $file" }; $arguments += '/resource:'+$path+','+$resources[$file] }
 $arguments += (Join-Path $PSScriptRoot 'WinDropSetup.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'AdapterCatalog.cs')

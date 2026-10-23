@@ -1,6 +1,6 @@
 # Installation and distribution
 
-`SwooshDropSetup.exe` is a per-user GUI installer using .NET Framework 4.8. It contains the app, Linux runtime payload, adapter catalog, bootstrap, notices, and corresponding GPL source archive. Copy it to another PC without this development folder. Internet is required for initial runtime provisioning.
+`SwooshDropSetup.exe` is a per-user GUI installer using .NET Framework 4.8. It contains the app, Linux runtime payload, adapter catalog, bootstrap, notices, and an exact source offer. The corresponding GPL source archive is a separate asset on the same GitHub release page. Copy the installer to another PC without this development folder. Internet is required for initial runtime provisioning.
 
 Requires Windows 10 22H2 or Windows 11, Intel/AMD x64, virtualization and WSL 2, a supported dedicated USB Wi-Fi adapter, and a separate internet connection. Only the development Windows 11 PC has been checked; clean Windows 10 and a second PC remain unverified.
 
@@ -12,11 +12,12 @@ Prerequisite downloads use pinned SHA-256 hashes. WSL/usbipd MSI files also requ
 | History, preferences, previews, app logs | `Data` under that folder |
 | Fresh runtime VHD | `Data\WSL` under that folder |
 | Prerequisite downloads | `SetupCache` under that folder |
-| Corresponding GPL source and notices | `Sources` under that folder |
+| Source offer and notices | `Sources` under that folder |
+| Corresponding GPL source archive | Same GitHub release page as the installer |
 | Received files | `Downloads\SwooshDrop` on new installs; existing users keep their selected folder |
 | WSL distribution | `WinDropRuntime` |
 
-The approximately 256 MiB installer embeds the source archive; first setup additionally downloads an approximately 340 MB Ubuntu image and Linux packages. Allow several GB of free space. No personal photos, captures, credentials, or development Linux home directories are packaged.
+The slim installer is approximately 4 MiB. The separate corresponding-source archive is approximately 253 MiB; first setup additionally downloads an approximately 340 MB Ubuntu image and Linux packages. Allow several GB of free space. No personal photos, captures, credentials, or development Linux home directories are packaged.
 
 Setup will not overwrite an existing same-named distro without its `/etc/windrop-owned-distro` marker. The bootstrap also checks its managed runtime marker. Drivers use a private module tree in `/opt/airdrop-lab/drivers`; the existing kernel and WSL module files are preserved.
 

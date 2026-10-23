@@ -38,7 +38,7 @@ $arguments += '/resource:' + (Join-Path $build 'ThroughPath.txt') + ',UI.Through
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'LICENSE') + ',Notices.App-LICENSE.txt'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'licenses\WinDrop-LICENSE.txt') + ',Notices.Protocol-LICENSE.txt'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'adapters.json') + ',Config.adapters.json'
-$arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'ToastActivation.cs'),(Join-Path $PSScriptRoot 'AdapterCatalog.cs'),(Join-Path $PSScriptRoot 'UpdateChecker.cs')
+$arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'AppFeatures.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'ToastActivation.cs'),(Join-Path $PSScriptRoot 'AdapterCatalog.cs'),(Join-Path $PSScriptRoot 'UpdateChecker.cs')
 $arguments += (Join-Path $PSScriptRoot 'AirDropWake.cs')
 & (Join-Path $framework 'csc.exe') @arguments
 if ($LASTEXITCODE -ne 0) { throw 'SwooshDrop compilation failed.' }

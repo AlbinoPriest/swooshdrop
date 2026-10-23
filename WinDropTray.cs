@@ -28,22 +28,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.6.0")]
-[assembly: AssemblyFileVersion("0.3.6.0")]
-
-public class Preferences
-{
-    public string SaveFolder { get; set; }
-    public bool ReceiveOnLaunch { get; set; }
-    public bool PauseAtSignIn { get; set; }
-    public bool Notifications { get; set; }
-    public string NotificationMode { get; set; }
-    public bool OpenLinksOnReceive { get; set; }
-    public string RuntimeDistro { get; set; }
-    public string AdapterInstanceId { get; set; }
-    public bool AutomaticUpdates { get; set; }
-    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SwooshDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; RuntimeDistro = "WinDropRuntime"; AutomaticUpdates = true; }
-}
+[assembly: AssemblyVersion("0.3.6.2")]
+[assembly: AssemblyFileVersion("0.3.6.2")]
 
 public class TransferItem : INotifyPropertyChanged
 {
@@ -56,9 +42,11 @@ public class TransferItem : INotifyPropertyChanged
     public DateTime ReceivedAt { get; set; }
     string preview;
     public string PreviewPath { get { return preview; } set { preview = value; if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("PreviewPath")); } }
-    public string Kind { get { return !string.IsNullOrEmpty(Link) ? "WEB LINK" : IsPhoto(Path) ? "PHOTO" : "FILE"; } }
-    public string Glyph { get { return Kind == "WEB LINK" ? "↗" : Kind == "PHOTO" ? "▧" : "≡"; } }
-    public string Detail { get { return ReceivedAt.ToLocalTime().ToString("MMM d · HH:mm") + "  ·  " + (Bytes >= 1048576 ? (Bytes / 1048576.0).ToString("0.0") + " MB" : (Bytes / 1024.0).ToString("0") + " KB"); } }
+    public string Kind { get { return I18n.Text(!string.IsNullOrEmpty(Link) ? "WEB LINK" : IsPhoto(Path) ? "PHOTO" : "FILE"); } }
+    public string Glyph { get { return !string.IsNullOrEmpty(Link) ? "↗" : IsPhoto(Path) ? "▧" : "≡"; } }
+    public string Detail { get { return ReceivedAt.ToLocalTime().ToString("MMM d · HH:mm", I18n.Culture) + "  ·  " + (Bytes >= 1048576 ? (Bytes / 1048576.0).ToString("0.0", I18n.Culture) + " MB" : (Bytes / 1024.0).ToString("0", I18n.Culture) + " KB"); } }
+    public string OpenLabel { get { return I18n.Text("Open"); } }
+    public string ShowInFolderLabel { get { return I18n.Text("Show in folder"); } }
     public event PropertyChangedEventHandler PropertyChanged;
     public static bool IsPhoto(string path) { string ext = System.IO.Path.GetExtension(path ?? "").ToLowerInvariant(); return Array.IndexOf(new string[] { ".heic", ".heif", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp" }, ext) >= 0; }
 }
@@ -92,13 +80,15 @@ public sealed class WinDropTray
     UpdateResult latestRelease;
     bool checkingUpdates;
     DateTime lastUpdateAttempt;
+    readonly DispatcherTimer progressDismiss = new DispatcherTimer();
+    readonly DispatcherTimer transferFailureDelay = new DispatcherTimer();
     Preferences settings;
     Process receiver;
     string control, bus, token, sessionDevice;
-    bool ownsSession, busy, quitting, receivingIntent, loadingSettings, rendering;
+    bool ownsSession, busy, quitting, receivingIntent, loadingSettings, rendering, transferInProgress;
     Dictionary<string, object> incoming;
     DateTime deadline;
-    string incomingPreview, lastSender;
+    string incomingPreview, lastSender, pendingTransferFailure;
     Window popup;
     Window flyout;
     DateTime ignoreTrayClicksUntil;
@@ -109,6 +99,7 @@ public sealed class WinDropTray
     CancellationTokenSource outgoingPreparation;
     AirDropWake outgoingWake;
     readonly DispatcherTimer wakeExpiry = new DispatcherTimer();
+    Forms.ToolStripItem trayOpen, trayFolder, trayStart, trayStop, trayQuit;
 
     [STAThread]
     public static void Main(string[] args)
@@ -138,6 +129,8 @@ public sealed class WinDropTray
                 {
                     string page = Option(args, "--render-page");
                     if (page == "Received" || page == "Send" || page == "Settings" || page == "About") app.Page(page);
+                    if (Array.IndexOf(args, "--render-progress") >= 0)
+                        app.ShowTransferProgress("Natsu’s iPhone", "Weekend photo.heic", 2, 3, 1572864, 3145728, false);
                     app.window.Show(); app.Render(app.window, Option(args, "--render"));
                 }
                 app.quitting = true; application.Shutdown(); return;
@@ -159,7 +152,7 @@ public sealed class WinDropTray
             {
                 if (startReceiving) { app.receivingIntent = true; await app.StartReceiving(); }
                 else if (background && app.settings.PauseAtSignIn)
-                    app.SetStatus("Receiving paused", "Started with Windows without waking WSL. Press Start receiving when you want to AirDrop.", false);
+                    app.SetStatus(I18n.Text("Receiving paused"), I18n.Text("Started with Windows without waking WSL. Press Start receiving when you want to AirDrop."), false);
                 if (args.Length > 0 && args[0].StartsWith("windrop://", StringComparison.OrdinalIgnoreCase)) app.Activate(args[0]);
             }), DispatcherPriority.ApplicationIdle);
             try { application.Run(); }
@@ -189,6 +182,9 @@ public sealed class WinDropTray
         data = dataOverride ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "WinDrop", "Data");
         runtime = Path.Combine(data, "Runtime"); Directory.CreateDirectory(data); Directory.CreateDirectory(Path.Combine(data, "Previews"));
         settings = Read<Preferences>("settings.json") ?? new Preferences();
+        bool migrated = SettingsPolicy.Normalize(settings);
+        I18n.SetLanguage(settings.Language);
+        if (migrated) try { Write("settings.json", settings); } catch (IOException ex) { Log("Settings migration: " + ex.Message); }
         window = (Window)XamlReader.Parse(ResourceText("MainWindow.xaml"));
         if (!rendering) ConfigureButtonMotion();
         window.SourceInitialized += delegate
@@ -244,7 +240,7 @@ public sealed class WinDropTray
         Find<Button>("SetupButton").Click += async delegate
         {
             string setup = Path.Combine(Path.GetDirectoryName(exe), "SwooshDropSetup.exe");
-            if (!File.Exists(setup)) { MessageBox.Show("Download and run SwooshDropSetup.exe to set up this PC or change its adapter.", "SwooshDrop Setup"); return; }
+            if (!File.Exists(setup)) { MessageBox.Show(I18n.Text("Download and run SwooshDropSetup.exe to set up this PC or change its adapter."), "SwooshDrop Setup"); return; }
             receivingIntent = false; await StopReceiving(); if (ownsSession) return;
             Process.Start(setup); quitting = true; tray.Dispose(); Application.Current.Shutdown();
         };
@@ -257,7 +253,9 @@ public sealed class WinDropTray
         Find<RadioButton>("WindowsNotificationRadio").IsChecked = NotificationMode == "windows";
         Find<RadioButton>("AppPopupRadio").IsChecked = NotificationMode == "app";
         Find<CheckBox>("OpenLinksCheck").IsChecked = settings.OpenLinksOnReceive;
-        Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder;
+        Find<TextBox>("DeviceNameInput").Text = settings.DeviceName;
+        Find<TextBox>("SaveFolderInput").Text = settings.SaveFolder;
+        SelectLanguage(settings.Language);
         loadingSettings = false;
         latestRelease = Read<UpdateResult>("updates.json");
         if (latestRelease != null && (UpdateChecker.ParseVersion(latestRelease.Version) == null || !UpdateChecker.IsReleaseUrl(latestRelease.ReleaseUrl) || latestRelease.CheckedUtc > DateTime.UtcNow)) latestRelease = null;
@@ -279,23 +277,45 @@ public sealed class WinDropTray
         {
             if (loadingSettings) return;
             try { NativeIntegration.SetAutostart(exe, Find<CheckBox>("AutostartCheck").IsChecked == true); }
-            catch (Exception ex) { Log("Autostart: " + ex.Message); Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled(); MessageBox.Show("Windows could not save the startup setting.", "SwooshDrop"); }
+            catch (Exception ex) { Log("Autostart: " + ex.Message); Find<CheckBox>("AutostartCheck").IsChecked = NativeIntegration.IsAutostartEnabled(); MessageBox.Show(I18n.Text("Windows could not save the startup setting."), "SwooshDrop"); }
         };
         Find<CheckBox>("PauseAtSignInCheck").Click += delegate { settings.PauseAtSignIn = Find<CheckBox>("PauseAtSignInCheck").IsChecked == true; SaveSettings(); };
         Find<CheckBox>("ReceiveOnLaunchCheck").Click += delegate { settings.ReceiveOnLaunch = Find<CheckBox>("ReceiveOnLaunchCheck").IsChecked == true; SaveSettings(); };
         Find<RadioButton>("WindowsNotificationRadio").Click += delegate { SetNotificationMode("windows"); };
         Find<RadioButton>("AppPopupRadio").Click += delegate { SetNotificationMode("app"); };
         Find<CheckBox>("OpenLinksCheck").Click += delegate { settings.OpenLinksOnReceive = Find<CheckBox>("OpenLinksCheck").IsChecked == true; SaveSettings(); };
-        Find<Button>("ChangeFolderButton").Click += delegate
+        Find<ComboBox>("LanguageCombo").SelectionChanged += delegate
         {
-            using (var picker = new Forms.FolderBrowserDialog { Description = "Choose where SwooshDrop saves received files", SelectedPath = settings.SaveFolder })
-                if (picker.ShowDialog() == Forms.DialogResult.OK) { settings.SaveFolder = picker.SelectedPath; Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder; SaveSettings(); }
+            if (loadingSettings) return;
+            var selected = Find<ComboBox>("LanguageCombo").SelectedItem as ComboBoxItem;
+            if (selected == null) return;
+            settings.Language = SettingsPolicy.NormalizeLanguage(Convert.ToString(selected.Tag));
+            I18n.SetLanguage(settings.Language); SaveSettings(); ApplyLanguage();
         };
+        Find<Button>("SaveDeviceNameButton").Click += async delegate { await SaveDeviceName(Find<TextBox>("DeviceNameInput").Text); };
+        Find<Button>("ResetDeviceNameButton").Click += async delegate { Find<TextBox>("DeviceNameInput").Text = "SwooshDrop"; await SaveDeviceName("SwooshDrop"); };
+        Find<Button>("ChangeFolderButton").Click += async delegate
+        {
+            using (var picker = new Forms.FolderBrowserDialog { Description = I18n.Text("Choose where SwooshDrop saves received files"), SelectedPath = settings.SaveFolder })
+                if (picker.ShowDialog() == Forms.DialogResult.OK) { Find<TextBox>("SaveFolderInput").Text = picker.SelectedPath; await ApplySaveFolder(picker.SelectedPath); }
+        };
+        Find<Button>("ApplyFolderButton").Click += async delegate { await ApplySaveFolder(Find<TextBox>("SaveFolderInput").Text); };
+        Find<Button>("OpenSaveFolderButton").Click += delegate { OpenFolder(); };
+        Find<Button>("ResetFolderButton").Click += async delegate { string folder = SettingsPolicy.DefaultSaveFolder(); Find<TextBox>("SaveFolderInput").Text = folder; await ApplySaveFolder(folder); };
         Find<Button>("CopyLogsButton").Click += delegate { try { Clipboard.SetText(Find<TextBox>("LogsTextBox").Text ?? ""); } catch (Exception ex) { Log("Copy logs: " + ex.Message); } };
         Find<Button>("OpenLogsButton").Click += delegate { string folder = Path.GetDirectoryName(SelectedLogPath()); Directory.CreateDirectory(folder); Process.Start("explorer.exe", Quote(folder)); };
         Find<ComboBox>("LogSourceCombo").SelectionChanged += delegate { RefreshLogView(); };
         logRefresh.Interval = TimeSpan.FromSeconds(2);
         logRefresh.Tick += delegate { if (Find<UIElement>("SettingsPage").Visibility == Visibility.Visible) RefreshLogView(); };
+        progressDismiss.Interval = TimeSpan.FromSeconds(2);
+        progressDismiss.Tick += delegate { progressDismiss.Stop(); Find<Border>("TransferProgressCard").Visibility = Visibility.Collapsed; };
+        transferFailureDelay.Interval = TimeSpan.FromSeconds(1.5);
+        transferFailureDelay.Tick += delegate
+        {
+            transferFailureDelay.Stop();
+            string reason = pendingTransferFailure; pendingTransferFailure = null;
+            if (transferInProgress && !string.IsNullOrEmpty(reason)) RecoverFromTransferFailure(reason);
+        };
         if (!render) logRefresh.Start();
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
@@ -308,12 +328,12 @@ public sealed class WinDropTray
             UpdateTrayIcon();
             tray.Text = "SwooshDrop"; tray.Visible = true;
             var menu = new Forms.ContextMenuStrip();
-            menu.Items.Add("Open SwooshDrop", null, delegate { ShowWindow(); });
-            menu.Items.Add("Open received folder", null, delegate { OpenFolder(); });
+            trayOpen = menu.Items.Add(I18n.Text("Open SwooshDrop"), null, delegate { ShowWindow(); });
+            trayFolder = menu.Items.Add(I18n.Text("Open received folder"), null, delegate { OpenFolder(); });
             menu.Items.Add("Check for updates", null, async delegate { ShowWindow(); Page("Settings"); await CheckForUpdates(true); });
-            menu.Items.Add("Start receiving", null, async delegate { receivingIntent = true; await StartReceiving(); });
-            menu.Items.Add("Stop receiving", null, async delegate { receivingIntent = false; await StopReceiving(); });
-            menu.Items.Add("Quit", null, async delegate { if (busy) return; receivingIntent = false; await StopReceiving(); if (ownsSession) return; quitting = true; tray.Dispose(); Application.Current.Shutdown(); });
+            trayStart = menu.Items.Add(I18n.Text("Start receiving"), null, async delegate { receivingIntent = true; await StartReceiving(); });
+            trayStop = menu.Items.Add(I18n.Text("Stop receiving"), null, async delegate { receivingIntent = false; await StopReceiving(); });
+            trayQuit = menu.Items.Add(I18n.Text("Quit"), null, async delegate { if (busy) return; receivingIntent = false; await StopReceiving(); if (ownsSession) return; quitting = true; tray.Dispose(); Application.Current.Shutdown(); });
             tray.ContextMenuStrip = menu;
             trayClickDelay.Interval = TimeSpan.FromMilliseconds(240);
             trayClickDelay.Tick += delegate { trayClickDelay.Stop(); ToggleTrayFlyout(); };
@@ -322,6 +342,126 @@ public sealed class WinDropTray
             retry.Interval = TimeSpan.FromSeconds(20); retry.Tick += async delegate { if (receivingIntent && !busy && !ownsSession) await StartReceiving(); }; retry.Start();
             expiry.Interval = TimeSpan.FromSeconds(1); expiry.Tick += delegate { if (incoming == null) return; int remaining = Math.Max(0, (int)(deadline - DateTime.UtcNow).TotalSeconds); if (popup != null) ((TextBlock)popup.FindName("CountdownText")).Text = remaining + "s"; if (remaining == 0) Decide(false); }; expiry.Start();
         }
+        ApplyLanguage();
+    }
+
+    void SelectLanguage(string language)
+    {
+        var combo = Find<ComboBox>("LanguageCombo"); if (combo == null) return;
+        foreach (ComboBoxItem item in combo.Items)
+            if (string.Equals(Convert.ToString(item.Tag), SettingsPolicy.NormalizeLanguage(language), StringComparison.OrdinalIgnoreCase)) { combo.SelectedItem = item; return; }
+    }
+
+    void TranslateTree(DependencyObject root)
+    {
+        if (root == null) return;
+        var text = root as TextBlock; if (text != null) text.Text = I18n.Text(text.Text);
+        var content = root as ContentControl; if (content != null && content.Content is string) content.Content = I18n.Text((string)content.Content);
+        var element = root as FrameworkElement; if (element != null && element.ToolTip is string) element.ToolTip = I18n.Text((string)element.ToolTip);
+        foreach (object child in LogicalTreeHelper.GetChildren(root)) { var dependency = child as DependencyObject; if (dependency != null) TranslateTree(dependency); }
+    }
+
+    void ApplyLanguage()
+    {
+        I18n.SetLanguage(settings.Language);
+        TranslateTree(window); TranslateTree(popup); TranslateTree(flyout);
+        loadingSettings = true; SelectLanguage(settings.Language); loadingSettings = false;
+        if (trayOpen != null) trayOpen.Text = I18n.Text("Open SwooshDrop");
+        if (trayFolder != null) trayFolder.Text = I18n.Text("Open received folder");
+        if (trayStart != null) trayStart.Text = I18n.Text("Start receiving");
+        if (trayStop != null) trayStop.Text = I18n.Text("Stop receiving");
+        if (trayQuit != null) trayQuit.Text = I18n.Text("Quit");
+        RefreshDeviceInstructions();
+        Page(currentPage); UpdateCount();
+        var transfers = Find<ItemsControl>("Transfers"); if (transfers != null) transfers.Items.Refresh();
+        if (!busy && incoming == null)
+            SetStatus(I18n.Text(ownsSession ? "Ready to receive" : "Receiving is off"), ownsSession ? I18n.Format("On iPhone: Share → AirDrop → {0}. Discovery may take a moment.", settings.DeviceName) : I18n.Text("Start receiving whenever you're ready."), ownsSession);
+        UpdateTrayFlyout();
+    }
+
+    void RefreshDeviceInstructions()
+    {
+        var sidebar = Find<TextBlock>("SidebarInstructionText"); if (sidebar != null) sidebar.Text = I18n.Format("Choose {0} on your iPhone.", settings.DeviceName);
+        var empty = Find<TextBlock>("EmptyInstructionText"); if (empty != null) empty.Text = I18n.Format("Choose {0} in your iPhone’s AirDrop menu.", settings.DeviceName);
+    }
+
+    async Task SaveDeviceName(string value)
+    {
+        string normalized, error;
+        if (!SettingsPolicy.TryNormalizeDeviceName(value, out normalized, out error))
+        {
+            Find<TextBlock>("DeviceNameStatusText").Text = I18n.Text(error);
+            MessageBox.Show(I18n.Text(error), "SwooshDrop", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        bool changed = !string.Equals(settings.DeviceName, normalized, StringComparison.Ordinal);
+        settings.DeviceName = normalized; Find<TextBox>("DeviceNameInput").Text = normalized; SaveSettings(); RefreshDeviceInstructions();
+        var status = Find<TextBlock>("DeviceNameStatusText");
+        if (!changed) { status.Text = I18n.Text("Device name saved."); return; }
+        await ApplyRestartRequiredChange(status, I18n.Text("Device name saved."));
+    }
+
+    async Task ApplySaveFolder(string value)
+    {
+        string original = settings.SaveFolder;
+        try
+        {
+            string candidate = (value ?? "").Trim().Trim('"');
+            if (!Path.IsPathRooted(candidate) || candidate.StartsWith("\\\\", StringComparison.Ordinal)) throw new InvalidOperationException(I18n.Text("SwooshDrop needs a local drive folder that WSL2 can access."));
+            candidate = Path.GetFullPath(candidate);
+            string root = Path.GetPathRoot(candidate); var drive = new DriveInfo(root);
+            if (!drive.IsReady) throw new InvalidOperationException(I18n.Text("The selected folder is not available."));
+            if (!Directory.Exists(candidate))
+            {
+                var answer = MessageBox.Show(candidate + "\n\n" + I18n.Text("Do you want SwooshDrop to create it?"), I18n.Text("Folder does not exist"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (answer != MessageBoxResult.Yes) { Find<TextBox>("SaveFolderInput").Text = original; return; }
+                Directory.CreateDirectory(candidate);
+            }
+            string probe = Path.Combine(candidate, ".swooshdrop-write-test-" + Guid.NewGuid().ToString("N"));
+            try { using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { } }
+            catch (Exception ex) { throw new InvalidOperationException(I18n.Text("SwooshDrop cannot write to this folder."), ex); }
+            bool changed = !string.Equals(settings.SaveFolder, candidate, StringComparison.OrdinalIgnoreCase);
+            settings.SaveFolder = candidate; Find<TextBox>("SaveFolderInput").Text = candidate; SaveSettings();
+            var status = Find<TextBlock>("FolderStatusText");
+            if (!changed) { status.Text = I18n.Text("Save folder updated."); return; }
+            await ApplyRestartRequiredChange(status, I18n.Text("Save folder updated."));
+        }
+        catch (Exception ex)
+        {
+            Find<TextBox>("SaveFolderInput").Text = original;
+            Find<TextBlock>("FolderStatusText").Text = ex.Message;
+            MessageBox.Show(ex.Message, "SwooshDrop", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    async Task ApplyRestartRequiredChange(TextBlock status, string savedMessage)
+    {
+        if (!ownsSession || busy)
+        {
+            status.Text = savedMessage + " " + I18n.Text("The new setting will be used the next time receiving starts.");
+            return;
+        }
+        var answer = MessageBox.Show(
+            I18n.Text("Applying this change now will stop any transfer currently in progress. Choose No to apply it the next time receiving starts."),
+            I18n.Text("Restart receiving now?"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            status.Text = I18n.Text("Change saved. Restart receiving to apply it.");
+            return;
+        }
+        receivingIntent = false;
+        await StopReceiving();
+        if (ownsSession)
+        {
+            receivingIntent = true;
+            status.Text = I18n.Text("Could not restart receiving. Use the main Start button to try again.");
+            return;
+        }
+        receivingIntent = true;
+        await StartReceiving();
+        status.Text = I18n.Text(ownsSession ? "Receiving restarted. The new setting is active." : "Could not restart receiving. Use the main Start button to try again.");
     }
 
     void RefreshUpdateView(string status)
@@ -372,8 +512,8 @@ public sealed class WinDropTray
         }
         var title = Find<TextBlock>("PageTitleText");
         var subtitle = Find<TextBlock>("PageSubtitleText");
-        if (title != null) title.Text = name == "Received" ? "Your latest arrivals." : name == "Send" ? "Out the window." : name == "Settings" ? "Make it yours." : "About SwooshDrop.";
-        if (subtitle != null) subtitle.Text = name == "Received" ? "Photos, files and links. Right here." : name == "Send" ? "Send original files to a nearby device." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
+        if (title != null) title.Text = I18n.Text(name == "Received" ? "Your latest arrivals." : name == "Send" ? "Out the window." : name == "Settings" ? "Make it yours." : "About SwooshDrop.");
+        if (subtitle != null) subtitle.Text = I18n.Text(name == "Received" ? "Photos, files and links. Right here." : name == "Send" ? "Send original files to a nearby device." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.");
         if (name == "Settings") RefreshLogView();
         currentPage = name;
         if (changed) AnimateEntrance(Find<FrameworkElement>(name + "Page"), 8, 180);
@@ -412,7 +552,12 @@ public sealed class WinDropTray
         button.BeginAnimation(UIElement.OpacityProperty, fade);
     }
     void ShowWindow() { HideTrayFlyout(); window.Show(); window.WindowState = WindowState.Normal; window.Activate(); }
-    void OpenFolder() { HideTrayFlyout(); Directory.CreateDirectory(settings.SaveFolder); Process.Start("explorer.exe", Quote(settings.SaveFolder)); }
+    void OpenFolder()
+    {
+        HideTrayFlyout();
+        try { Directory.CreateDirectory(settings.SaveFolder); Process.Start("explorer.exe", Quote(settings.SaveFolder)); }
+        catch (Exception ex) { Log("Open folder: " + ex.Message); MessageBox.Show(I18n.Text("The selected folder is not available."), "SwooshDrop", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
     T FindFlyout<T>(string name) where T : class { return flyout == null ? null : flyout.FindName(name) as T; }
     static void ApplyBrand(Window target)
     {
@@ -433,6 +578,7 @@ public sealed class WinDropTray
         {
             flyout = (Window)XamlReader.Parse(ResourceText("TrayFlyout.xaml"));
             ApplyBrand(flyout);
+            TranslateTree(flyout);
             flyout.Deactivated += delegate { if (!rendering) HideTrayFlyout(); };
             FindFlyout<Button>("FlyoutOpenButton").Click += delegate { ShowWindow(); };
             FindFlyout<Button>("FlyoutFolderButton").Click += delegate { OpenFolder(); };
@@ -480,21 +626,21 @@ public sealed class WinDropTray
         if (flyout == null) return;
         var status = FindFlyout<TextBlock>("FlyoutStatusText"); if (status != null) status.Text = Find<TextBlock>("StatusText").Text;
         var detail = FindFlyout<TextBlock>("FlyoutStatusDetail"); if (detail != null) detail.Text = Find<TextBlock>("StatusDetail").Text;
-        var last = FindFlyout<TextBlock>("FlyoutLastText"); if (last != null) last.Text = items.Count == 0 ? "No transfers yet" : items[0].Name + " · " + items[0].ReceivedAt.ToLocalTime().ToString("HH:mm");
-        var count = FindFlyout<TextBlock>("FlyoutCountText"); if (count != null) count.Text = items.Count + (items.Count == 1 ? " received item" : " received items");
-        var adapter = FindFlyout<TextBlock>("FlyoutAdapterText"); if (adapter != null) adapter.Text = ownsSession ? "Connected" : string.IsNullOrEmpty(settings.AdapterInstanceId) ? "Not selected" : "Released to Windows";
-        var runtimeStatus = FindFlyout<TextBlock>("FlyoutRuntimeText"); if (runtimeStatus != null) runtimeStatus.Text = busy ? ownsSession ? "Stopping…" : "Starting…" : ownsSession ? "WSL2 running" : "Stopped";
+        var last = FindFlyout<TextBlock>("FlyoutLastText"); if (last != null) last.Text = items.Count == 0 ? I18n.Text("No transfers yet") : items[0].Name + " · " + items[0].ReceivedAt.ToLocalTime().ToString("HH:mm", I18n.Culture);
+        var count = FindFlyout<TextBlock>("FlyoutCountText"); if (count != null) count.Text = I18n.Format(items.Count == 1 ? "{0} received item" : "{0} received items", items.Count);
+        var adapter = FindFlyout<TextBlock>("FlyoutAdapterText"); if (adapter != null) adapter.Text = I18n.Text(ownsSession ? "Connected" : string.IsNullOrEmpty(settings.AdapterInstanceId) ? "Not selected" : "Released to Windows");
+        var runtimeStatus = FindFlyout<TextBlock>("FlyoutRuntimeText"); if (runtimeStatus != null) runtimeStatus.Text = I18n.Text(busy ? ownsSession ? "Stopping…" : "Starting…" : ownsSession ? "WSL2 running" : "Stopped");
         var dot = FindFlyout<System.Windows.Shapes.Ellipse>("FlyoutStatusDot"); if (dot != null) dot.Fill = Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill;
-        var toggle = FindFlyout<Button>("FlyoutReceiveButton"); if (toggle != null) { toggle.Content = busy ? "Working…" : ownsSession ? "Stop receiving" : "Start receiving"; toggle.IsEnabled = !busy; }
+        var toggle = FindFlyout<Button>("FlyoutReceiveButton"); if (toggle != null) { toggle.Content = I18n.Text(busy ? "Working…" : ownsSession ? "Stop receiving" : "Start receiving"); toggle.IsEnabled = !busy; }
     }
-    void UpdateCount() { Find<TextBlock>("CountText").Text = items.Count + (items.Count == 1 ? " item" : " items"); Find<StackPanel>("EmptyState").Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; UpdateTrayFlyout(); }
+    void UpdateCount() { Find<TextBlock>("CountText").Text = I18n.Format(items.Count == 1 ? "{0} item" : "{0} items", items.Count); Find<StackPanel>("EmptyState").Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; UpdateTrayFlyout(); }
     void SetStatus(string title, string detail, bool ready)
     {
         receiverReady = ready;
         RefreshOutgoingControls();
         Find<TextBlock>("StatusText").Text = title; Find<TextBlock>("StatusDetail").Text = detail;
         Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#F39485" : "#737780"));
-        Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving";
+        Find<Button>("ReceiveButton").Content = I18n.Text(ownsSession ? "Stop receiving" : "Start receiving");
         Find<Button>("ReceiveButton").IsEnabled = !busy;
         if (!rendering) tray.Text = "SwooshDrop · " + title.Substring(0, Math.Min(48, title.Length));
         UpdateTrayFlyout();
@@ -522,7 +668,7 @@ public sealed class WinDropTray
         string path = SelectedLogPath();
         try
         {
-            if (!File.Exists(path)) { box.Text = "No events recorded yet."; return; }
+            if (!File.Exists(path)) { box.Text = I18n.Text("No events recorded yet."); return; }
             string tail;
             using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
@@ -583,15 +729,15 @@ public sealed class WinDropTray
         var item = button.Tag as TransferItem; if (item == null) return;
         try
         {
-            if (Convert.ToString(button.Content) == "Show in folder") Process.Start("explorer.exe", "/select," + Quote(item.Path));
+            if (Convert.ToString(button.Content) == I18n.Text("Show in folder")) Process.Start("explorer.exe", "/select," + Quote(item.Path));
             else if (!string.IsNullOrEmpty(item.Link))
             {
                 OpenLink(item.Link);
             }
             else if (File.Exists(item.Path)) Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
-            else MessageBox.Show("This file was moved or deleted. You can still see its transfer details here.", "SwooshDrop");
+            else MessageBox.Show(I18n.Text("This file was moved or deleted. You can still see its transfer details here."), "SwooshDrop");
         }
-        catch (Exception ex) { Log("Open: " + ex.Message); MessageBox.Show("Windows couldn't open this item.", "SwooshDrop"); }
+        catch (Exception ex) { Log("Open: " + ex.Message); MessageBox.Show(I18n.Text("Windows couldn't open this item."), "SwooshDrop"); }
     }
     static void OpenLink(string link)
     {
@@ -755,7 +901,7 @@ public sealed class WinDropTray
     async Task StartReceiving()
     {
         if (busy || ownsSession || rendering) return;
-        busy = true; SetStatus("Getting ready…", "Connecting your dedicated adapter.", false); bool failed = false;
+        busy = true; SetStatus(I18n.Text("Getting ready…"), I18n.Text("Connecting your dedicated adapter."), false); bool failed = false;
         try
         {
             string saveFolder = settings.SaveFolder;
@@ -788,17 +934,29 @@ public sealed class WinDropTray
                     Wsl("bash", control, "attached", identity.Vendor, identity.Product, identity.Serial);
                 }
                 ownsSession = true; token = Guid.NewGuid().ToString("N"); Directory.CreateDirectory(saveFolder);
-                var info = Info("wsl.exe", "-d", settings.RuntimeDistro, "-u", "root", "--exec", "setsid", "--wait", "bash", script, profile.Driver, "--ui-events", LinuxPath(saveFolder), token, identity.Vendor, identity.Product, identity.Serial);
+                var info = Info("wsl.exe", "-d", settings.RuntimeDistro, "-u", "root", "--exec", "setsid", "--wait", "bash", script, profile.Driver, "--ui-events", LinuxPath(saveFolder), token, identity.Vendor, identity.Product, identity.Serial, settings.DeviceName);
                 info.RedirectStandardInput = true;
                 var child = new Process { StartInfo = info, EnableRaisingEvents = true }; receiver = child;
                 child.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) OnUi(delegate { if (child == receiver) HandleLine(e.Data); }); };
                 child.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) OnUi(delegate { if (child == receiver) Log(e.Data); }); };
-                child.Exited += delegate { OnUi(async delegate { if (child == receiver && ownsSession && !busy) { if (child.ExitCode == 75) ownsSession = false; else await StopReceiving(); SetStatus("Connection paused", "Click Start to reconnect, or wait for an automatic retry.", false); } }); };
+                child.Exited += delegate { OnUi(async delegate
+                {
+                    if (child != receiver || !ownsSession || busy) return;
+                    bool interrupted = transferInProgress;
+                    if (child.ExitCode == 75) ownsSession = false; else await StopReceiving();
+                    if (interrupted)
+                    {
+                        string reason = I18n.Text("The receiver stopped unexpectedly. SwooshDrop will retry automatically.");
+                        ShowTransferFailure(reason);
+                        SetStatus(I18n.Text("Connection paused"), reason, false);
+                    }
+                    else SetStatus(I18n.Text("Connection paused"), I18n.Text("Click Start to reconnect, or wait for an automatic retry."), false);
+                }); };
                 child.Start(); child.StandardInput.AutoFlush = true; child.BeginOutputReadLine(); child.BeginErrorReadLine();
             });
         }
-        catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving", ex.Message.Contains("adapter-missing") ? "Plug in your selected USB adapter. SwooshDrop will try again." : "Open Settings → Adapter setup to check this PC, or About → Open diagnostics.", false); }
-        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; UpdateTrayFlyout(); }
+        catch (Exception ex) { failed = true; Log("Start: " + ex.Message); SetStatus(I18n.Text(ex.Message.Contains("adapter-missing") ? "Connect your adapter" : "Couldn't start receiving"), I18n.Text(ex.Message.Contains("adapter-missing") ? "Plug in your selected USB adapter. SwooshDrop will try again." : "Open Settings → Adapter setup to check this PC, or About → Open diagnostics."), false); }
+        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = I18n.Text(ownsSession ? "Stop receiving" : "Start receiving"); UpdateTrayFlyout(); }
         if (failed && ownsSession) await StopReceiving();
         if (receiver != null && receiver.HasExited && ownsSession) await StopReceiving();
     }
@@ -831,10 +989,10 @@ public sealed class WinDropTray
                 }
             });
             ownsSession = false; if (receiver != null) { receiver.Dispose(); receiver = null; }
-            SetStatus("Receiving is off", "Start receiving whenever you're ready.", false);
+            SetStatus(I18n.Text("Receiving is off"), I18n.Text("Start receiving whenever you're ready."), false);
         }
-        catch (Exception ex) { Log("Stop: " + ex.Message); SetStatus("Still stopping", "Please try Stop again.", false); }
-        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving"; UpdateTrayFlyout(); }
+        catch (Exception ex) { Log("Stop: " + ex.Message); SetStatus(I18n.Text("Still stopping"), I18n.Text("Please try Stop again."), false); }
+        finally { busy = false; Find<Button>("ReceiveButton").IsEnabled = true; Find<Button>("ReceiveButton").Content = I18n.Text(ownsSession ? "Stop receiving" : "Start receiving"); UpdateTrayFlyout(); }
     }
 
     void HandleLine(string line)
@@ -844,9 +1002,15 @@ public sealed class WinDropTray
         {
             var item = json.Deserialize<Dictionary<string, object>>(line); string kind = Convert.ToString(item["kind"]);
             if (kind.StartsWith("outgoing-", StringComparison.Ordinal)) { HandleOutgoingEvent(kind, item); return; }
-            if (kind == "ready") SetStatus("Ready to receive", "On iPhone: Share → AirDrop → SwooshDrop. Discovery may take a moment.", true);
-            else if (kind == "log") Log(Convert.ToString(item["message"]));
+            if (kind == "ready") SetStatus(I18n.Text("Ready to receive"), I18n.Format("On iPhone: Share → AirDrop → {0}. Discovery may take a moment.", settings.DeviceName), true);
+            else if (kind == "log")
+            {
+                string message = Convert.ToString(item["message"]); Log(message);
+                string reason;
+                if (transferInProgress && TransferFailurePolicy.TryDescribe(message, out reason)) QueueTransferFailure(I18n.Text(reason));
+            }
             else if (kind == "consent") ReceiveConsent(item);
+            else if (kind == "progress") UpdateTransferProgress(item);
             else if (kind == "completed") Complete(item);
         }
         catch (Exception ex) { Log("UI event: " + ex.Message); }
@@ -856,14 +1020,15 @@ public sealed class WinDropTray
     void ReceiveConsent(Dictionary<string, object> item)
     {
         if (incoming != null) Decide(false);
+        if (!transferInProgress) HideTransferCard();
         incoming = item; deadline = DateTime.UtcNow.AddSeconds(55); lastSender = Convert.ToString(item["sender"]); incomingPreview = null;
         object preview; if (item.TryGetValue("preview", out preview) && preview is string) incomingPreview = SavePreview((string)preview, Convert.ToString(item["id"]));
         string[] links = Strings(item, "links"), files = Strings(item, "files");
         string description = links.Length > 0 ? string.Join("\n", links) : string.Join("\n", files);
-        Find<TextBlock>("PendingText").Text = lastSender + " wants to share " + (links.Length > 0 ? "a link" : files.Length + " file(s)"); Find<Border>("PendingBanner").Visibility = Visibility.Visible;
-        SetStatus("Incoming AirDrop", "Accept or decline the transfer from " + lastSender + ".", true);
+        Find<TextBlock>("PendingText").Text = I18n.Format("{0} wants to share {1}", lastSender, links.Length > 0 ? I18n.Text("a link") : I18n.Format("{0} file(s)", files.Length)); Find<Border>("PendingBanner").Visibility = Visibility.Visible;
+        SetStatus(I18n.Text("Incoming AirDrop"), I18n.Format("Accept or decline the transfer from {0}.", lastSender), true);
         string id = Convert.ToString(item["id"]);
-        Notify("AirDrop from " + lastSender, description, incomingPreview, id, async delegate(bool shown)
+        Notify(I18n.Format("AirDrop from {0}", lastSender), description, incomingPreview, id, async delegate(bool shown)
         {
             if (!shown && incoming != null && Convert.ToString(incoming["id"]) == id) OpenPopup();
             await Task.FromResult(0);
@@ -874,10 +1039,11 @@ public sealed class WinDropTray
         if (incoming == null || popup != null) return;
         popup = (Window)XamlReader.Parse(ResourceText("TransferPopup.xaml"));
         ApplyBrand(popup);
+        TranslateTree(popup);
         popup.Closed += delegate(object sender, EventArgs e) { if (ReferenceEquals(popup, sender)) popup = null; if (incoming != null) Decide(false); };
-        ((TextBlock)popup.FindName("SenderText")).Text = Convert.ToString(incoming["sender"]) + " wants to share";
+        ((TextBlock)popup.FindName("SenderText")).Text = I18n.Format("{0} wants to share", I18n.Text(Convert.ToString(incoming["sender"])));
         string[] links = Strings(incoming, "links"), files = Strings(incoming, "files");
-        ((TextBlock)popup.FindName("FilesText")).Text = links.Length > 0 ? (links.Length == 1 ? "Web link" : links.Length + " web links") : string.Join(", ", files);
+        ((TextBlock)popup.FindName("FilesText")).Text = links.Length > 0 ? (links.Length == 1 ? I18n.Text("Web link") : I18n.Format("{0} web links", links.Length)) : string.Join(", ", files);
         if (!string.IsNullOrEmpty(incomingPreview)) ((System.Windows.Controls.Image)popup.FindName("PreviewImage")).Source = ImageFile(incomingPreview);
         if (links.Length > 0) { var link = (TextBox)popup.FindName("LinkText"); link.Text = string.Join("\n\n", links); link.Visibility = Visibility.Visible; ((UIElement)popup.FindName("PreviewGlyph")).Visibility = Visibility.Collapsed; }
         ((Button)popup.FindName("AcceptButton")).Click += delegate { Decide(true); };
@@ -905,15 +1071,123 @@ public sealed class WinDropTray
     void Decide(bool accepted)
     {
         if (incoming == null) return;
+        string sender = Convert.ToString(incoming["sender"]);
+        string[] files = Strings(incoming, "files"), links = Strings(incoming, "links");
         string id = Convert.ToString(incoming["id"]); if (DateTime.UtcNow >= deadline) accepted = false;
         try { if (receiver != null && !receiver.HasExited) receiver.StandardInput.WriteLine(json.Serialize(new { id = id, accept = accepted })); }
         catch (Exception ex) { Log("Consent: " + ex.Message); accepted = false; }
         incoming = null; if (popup != null) { popup.Close(); popup = null; }
         Find<Border>("PendingBanner").Visibility = Visibility.Collapsed;
-        SetStatus(accepted ? "Receiving your drop…" : "Ready to receive", accepted ? "Saving the original files to your received folder." : "On iPhone: Share → AirDrop → SwooshDrop.", true);
+        if (accepted)
+        {
+            string name = links.Length > 0 ? links[0] : files.Length > 0 ? files[0] : I18n.Text("Preparing transfer…");
+            ShowTransferProgress(sender, name, 0, Math.Max(files.Length, links.Length), 0, 0, true);
+        }
+        SetStatus(I18n.Text(accepted ? "Receiving your drop…" : "Ready to receive"), accepted ? I18n.Text("Saving the original files to your received folder.") : I18n.Format("On iPhone: Share → AirDrop → {0}.", settings.DeviceName), true);
     }
+
+    void UpdateTransferProgress(Dictionary<string, object> item)
+    {
+        CancelPendingTransferFailure();
+        string sender = Convert.ToString(item["sender"]), file = Convert.ToString(item["file"]);
+        int index = Convert.ToInt32(item["index"]), count = Convert.ToInt32(item["count"]);
+        long received = Convert.ToInt64(item["received"]), total = Convert.ToInt64(item["total"]);
+        lastSender = sender;
+        ShowTransferProgress(sender, file, index, count, received, total, false);
+    }
+
+    void ShowTransferProgress(string sender, string file, int index, int count, long received, long total, bool preparing)
+    {
+        transferInProgress = true;
+        progressDismiss.Stop();
+        progressDismiss.Interval = TimeSpan.FromSeconds(2);
+        var card = Find<Border>("TransferProgressCard");
+        card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x36, 0x3A, 0x41));
+        card.Visibility = Visibility.Visible;
+        Find<TextBlock>("TransferProgressTitle").Text = I18n.Format("Receiving from {0}", string.IsNullOrWhiteSpace(sender) ? "AirDrop" : sender);
+        Find<TextBlock>("TransferProgressFileName").Text = file ?? "";
+        var bar = Find<ProgressBar>("TransferProgressBar");
+        bar.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF3, 0x94, 0x85));
+        bar.IsIndeterminate = preparing || total <= 0;
+        double percent = total <= 0 ? 0 : Math.Min(100, received * 100.0 / total);
+        bar.Value = percent;
+        Find<TextBlock>("TransferProgressDetail").Text = preparing
+            ? I18n.Text("Preparing transfer…")
+            : I18n.Format("File {0} of {1} · {2}% · {3} / {4}", Math.Max(1, index), Math.Max(1, count), percent.ToString("0", I18n.Culture), FormatBytes(received), FormatBytes(total));
+    }
+
+    void RecoverFromTransferFailure(string reason)
+    {
+        CancelPendingTransferFailure();
+        Log("Transfer recovery: " + reason);
+        ClearPendingRequest();
+        ShowTransferFailure(reason);
+        SetStatus(I18n.Text("Ready to receive again"), I18n.Format("The last transfer stopped: {0} SwooshDrop is still receiving.", reason), true);
+    }
+
+    void QueueTransferFailure(string reason)
+    {
+        pendingTransferFailure = reason;
+        transferFailureDelay.Stop(); transferFailureDelay.Start();
+    }
+
+    void CancelPendingTransferFailure()
+    {
+        transferFailureDelay.Stop(); pendingTransferFailure = null;
+    }
+
+    void ShowTransferFailure(string reason)
+    {
+        transferInProgress = false;
+        var card = Find<Border>("TransferProgressCard");
+        card.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD8, 0x66, 0x66));
+        card.Visibility = Visibility.Visible;
+        Find<TextBlock>("TransferProgressTitle").Text = I18n.Text("Transfer interrupted");
+        var bar = Find<ProgressBar>("TransferProgressBar");
+        bar.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD8, 0x66, 0x66));
+        bar.IsIndeterminate = false; bar.Value = 0;
+        Find<TextBlock>("TransferProgressDetail").Text = reason;
+        progressDismiss.Stop(); progressDismiss.Interval = TimeSpan.FromSeconds(10); progressDismiss.Start();
+    }
+
+    void ClearPendingRequest()
+    {
+        incoming = null;
+        if (popup != null) { Window stale = popup; popup = null; stale.Close(); }
+        Find<Border>("PendingBanner").Visibility = Visibility.Collapsed;
+        if (!string.IsNullOrEmpty(incomingPreview))
+        {
+            try { if (File.Exists(incomingPreview)) File.Delete(incomingPreview); }
+            catch (Exception ex) { Log("Preview cleanup: " + ex.Message); }
+            incomingPreview = null;
+        }
+    }
+
+    void ClearTransferPresentation(bool clearPreview)
+    {
+        CancelPendingTransferFailure();
+        transferInProgress = false;
+        progressDismiss.Stop(); HideTransferCard();
+        if (clearPreview) ClearPendingRequest();
+    }
+
+    void HideTransferCard()
+    {
+        Find<Border>("TransferProgressCard").Visibility = Visibility.Collapsed;
+    }
+
+    static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1073741824) return (bytes / 1073741824.0).ToString("0.0", I18n.Culture) + " GB";
+        if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0", I18n.Culture) + " MB";
+        if (bytes >= 1024) return (bytes / 1024.0).ToString("0.0", I18n.Culture) + " KB";
+        return bytes.ToString(I18n.Culture) + " B";
+    }
+
     void Complete(Dictionary<string, object> eventItem)
     {
+        CancelPendingTransferFailure();
+        transferInProgress = false;
         string[] files = Strings(eventItem, "files"), links = Strings(eventItem, "links");
         var added = new List<TransferItem>();
         foreach (string linux in files)
@@ -927,13 +1201,16 @@ public sealed class WinDropTray
         if (added.Count > 0 && links.Length == 0) added[0].PreviewPath = incomingPreview;
         foreach (var item in added) items.Insert(0, item);
         while (items.Count > 500) items.RemoveAt(items.Count - 1);
-        SaveHistory(); UpdateCount(); SetStatus("Ready for your next drop", "Saved to " + settings.SaveFolder, true);
-        Notify(links.Length > 0 ? "Link received" : "AirDrop received", links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), incomingPreview, null, null);
+        SaveHistory(); UpdateCount(); SetStatus(I18n.Text("Ready for your next drop"), I18n.Format("Saved to {0}", settings.SaveFolder), true);
+        var progress = Find<ProgressBar>("TransferProgressBar"); progress.IsIndeterminate = false; progress.Value = 100;
+        Find<TextBlock>("TransferProgressDetail").Text = I18n.Text("Transfer complete");
+        progressDismiss.Stop(); progressDismiss.Interval = TimeSpan.FromSeconds(2); progressDismiss.Start();
+        Notify(I18n.Text(links.Length > 0 ? "Link received" : "AirDrop received"), links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), incomingPreview, null, null);
         incomingPreview = null; QueueMissingPreviews();
         if (settings.OpenLinksOnReceive && added.Count > 0)
             foreach (string link in new HashSet<string>(links, StringComparer.Ordinal))
                 try { OpenLink(link); Log("Opened an accepted web link in the default browser."); }
-                catch (Exception ex) { Log("Open received link: " + ex.Message); SetStatus("Link saved", "Windows couldn't open your browser. Use Open in the gallery to try again.", true); }
+                catch (Exception ex) { Log("Open received link: " + ex.Message); SetStatus(I18n.Text("Link saved"), I18n.Text("Windows couldn't open your browser. Use Open in the gallery to try again."), true); }
     }
     static string WindowsPath(string linux)
     { if (linux.StartsWith("/mnt/") && linux.Length > 7 && char.IsLetter(linux[5]) && linux[6] == '/') return char.ToUpperInvariant(linux[5]) + ":\\" + linux.Substring(7).Replace('/', '\\'); return linux; }
@@ -992,7 +1269,7 @@ public sealed class WinDropTray
             shown = await Task.Run(delegate
             {
                 string request = Path.Combine(data, "toast-" + Guid.NewGuid().ToString("N") + ".json");
-                try { File.WriteAllText(request, new JavaScriptSerializer().Serialize(new { title = title, body = body, image = image, id = id, tag = id == null ? "received" : "incoming" }), Encoding.UTF8); Run("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Path.Combine(runtime, "Show-Toast.ps1"), "-RequestPath", request); return true; }
+                try { File.WriteAllText(request, new JavaScriptSerializer().Serialize(new { title = title, body = body, image = image, id = id, tag = id == null ? "received" : "incoming", accept = I18n.Text("Accept"), decline = I18n.Text("Decline") }), Encoding.UTF8); Run("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Path.Combine(runtime, "Show-Toast.ps1"), "-RequestPath", request); return true; }
                 catch (Exception ex) { Log("Notification: " + ex.Message); return false; }
                 finally { try { File.Delete(request); } catch (IOException) { } }
             });
