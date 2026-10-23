@@ -2,6 +2,7 @@
 set -euo pipefail
 repo=$(cd -- "$(dirname "$0")/.." && pwd)
 lab=/opt/airdrop-lab
+mkdir -p "$lab/work"
 stage=$(mktemp -d "$lab/work/product-backend.XXXXXX")
 # Build from the pinned upstream tree plus the shipped patch. Keep the small
 # source stage for build diagnostics rather than relying on local source edits.

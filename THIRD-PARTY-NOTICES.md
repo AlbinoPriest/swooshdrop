@@ -2,7 +2,7 @@
 
 SwooshDrop is an unofficial community adaptation developed independently by AlbinoPriest. It is not affiliated with, sponsored by, or endorsed by Apple, Microsoft, Uvejs Gjelaj, or the OWL maintainers. Its AirDrop protocol implementation incorporates and modifies Uvejs Gjelaj's WinDrop; the Windows frontend, installer, and hardware integration are this project's additions. These additions do not replace upstream authorship or license terms.
 
-The app embeds MIT-licensed WinDrop assemblies. Starting with 0.3, the setup EXE additionally embeds OWL, matching GPL Linux driver modules, minimal redistributable firmware, and component notices. Custom 0.3.6.2 and later publish the corresponding source archive as a separate asset on the same GitHub release page; setup installs a source offer under `Sources` with the exact release URL.
+The app embeds MIT-licensed WinDrop assemblies. Starting with 0.3, the setup EXE additionally embeds OWL, matching GPL Linux driver modules, minimal redistributable firmware, and component notices. Release builds using the slim installer distribute the matching corresponding-source archive as a separate asset on the same GitHub release page; setup installs a source offer under `Sources`. Unreleased preview installers must be accompanied by their corresponding sources before distribution.
 
 | Component | Upstream | License | Local notice |
 | --- | --- | --- | --- |
@@ -11,7 +11,9 @@ The app embeds MIT-licensed WinDrop assemblies. Starting with 0.3, the setup EXE
 | rtl8188eus driver | https://github.com/aircrack-ng/rtl8188eus | GPL-2.0-only; source headers credit Realtek Corporation | `licenses/RTL8188EU-LICENSE.txt` |
 | Matching WSL kernel source | https://github.com/microsoft/WSL2-Linux-Kernel | Linux kernel licensing, including GPL-2.0 | See upstream `COPYING` and `LICENSES/` |
 
-Exact revisions are in `source-versions.json`. `prototype-changes.patch` modifies MIT-licensed WinDrop. `driver-compatibility.patch` modifies GPL-2.0-only driver files. Original code in this repository does not change those licenses.
+Receive progress, localization, receiver settings and slim source-distribution improvements were contributed by [KuiDaXElaina](https://github.com/KuiDaXElaina/SwooshDrop); original commits and retained license terms are preserved.
+
+Exact revisions are in `source-versions.json`. The ordered patches in `patches/series` modify MIT-licensed WinDrop. `driver-compatibility.patch` modifies GPL-2.0-only driver files. Original code in this repository does not change those licenses.
 
 The driver repository has license declarations in its source headers rather than a top-level LICENSE file. The included GPL-2.0 text was copied from the matching Linux kernel's `LICENSES/preferred/GPL-2.0`, including its SPDX usage metadata.
 
