@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/KuiDaXElaina/SwooshDrop/releases/tag/v0.3.6-custom.2"><strong>Download the Windows beta ↗</strong></a>
+  <a href="https://github.com/AlbinoPriest/swooshdrop/releases"><strong>Download the Windows beta ↗</strong></a>
   &nbsp; · &nbsp;
   <a href="docs/COMPATIBILITY.md">Check your adapter</a>
   &nbsp; · &nbsp;
@@ -57,7 +57,10 @@ In the current source build, the tray icon is a grey outline with a transparent 
 
 - **Start with Windows**, with receiving enabled or paused until you need it.
 - **Pick your approval style:** Windows notifications or the integrated SwooshDrop popup.
-- **Choose your save folder** and whether accepted links open automatically.
+- **Choose your AirDrop name and save folder**, with a restart prompt when a running receiver needs to apply a change.
+- **Follow live receive progress** with the current filename, file position, percentage and bytes; interrupted transfers show an error.
+- **Switch the interface between English and Traditional Chinese (zh-TW).**
+- Choose whether accepted links open automatically.
 - **Read live logs** in Settings, with Activity, Radio, and Bridge views.
 - **Try sending files back** from the current source build's Send page: choose files, find nearby devices, select a recipient, then approve on the iPhone. Uses the same adapter and runtime as receiving. Outgoing transfers are experimental and have passed local protocol tests; real-iPhone sending is awaiting validation. Not included in the published 0.3.6 installer.
 - **Check for updates** in Settings or the tray menu. The current source build quietly checks GitHub once a day, includes beta releases, and offers a release-page download when a newer installer is available. Automatic checks can be disabled; nothing installs automatically.
@@ -68,7 +71,7 @@ Tempo Soft uses charcoal surfaces, soft coral accents, rounded controls, and edi
 ## Get your first drop
 
 1. **Check your hardware.** Use a compatible dedicated USB Wi-Fi adapter, with Ethernet or a separate adapter for internet access.
-2. **[Download the custom beta](https://github.com/KuiDaXElaina/SwooshDrop/releases/tag/v0.3.6-custom.2)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
+2. **[Download the beta](https://github.com/AlbinoPriest/swooshdrop/releases)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
 3. **Start receiving.** On your iPhone, turn on Wi-Fi and Bluetooth and choose AirDrop’s **Everyone for 10 Minutes** option.
 4. **Share → AirDrop → SwooshDrop.** Check the preview and press **Accept** on your PC.
 
@@ -85,7 +88,7 @@ Fresh installations save to **Downloads\SwooshDrop**. Upgrades keep your chosen 
 
 The adapter catalog includes **86 USB device IDs** with bundled Realtek and MediaTek drivers. All except the tested ID are experimental. Built-in PCI Wi-Fi, sharing Windows’ active Wi-Fi adapter, ARM/32-bit PCs, arbitrary adapters, and Contacts Only are unsupported.
 
-This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The installer is approximately **256 MiB** and includes corresponding source materials; setup downloads Ubuntu and runtime packages separately.
+This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The published 0.3.6 installer is approximately **256 MiB** and includes corresponding source materials. The upcoming source build uses a smaller installer and distributes corresponding source as a separate asset; setup downloads Ubuntu and runtime packages separately.
 
 **Still a beta.** Discovery can be intermittent. Fresh second-PC and Windows 10 installs, sustained throughput, Live Photos, metadata fidelity, and experimental adapters need more testing. Builds are unsigned. [What has been tested →](docs/VALIDATION.md)
 
@@ -100,6 +103,10 @@ This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Set
 | [Third-party notices](THIRD-PARTY-NOTICES.md) | Component licenses and retained upstream notices. |
 
 Found a bug? [Open an issue](https://github.com/AlbinoPriest/swooshdrop/issues) with your Windows version, adapter USB ID, and what happened. Remove personal paths and transfer names before sharing logs.
+
+## Contributors
+
+Thanks to [**KuiDaXElaina**](https://github.com/KuiDaXElaina) for [their SwooshDrop improvements](https://github.com/KuiDaXElaina/SwooshDrop): Traditional Chinese localization, configurable AirDrop names and save folders, restart prompts, live receive progress, interrupted-transfer feedback, and the smaller installer with separate source downloads. Their six original commits and authorship are preserved in the integration history. See [the changelog](CHANGELOG.md) for integration details.
 
 ## Built on open source
 

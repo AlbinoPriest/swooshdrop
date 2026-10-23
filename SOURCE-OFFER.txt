@@ -1,13 +1,16 @@
-SwooshDrop custom 0.3.6.2 corresponding source
+SwooshDrop 0.3.7 integration preview - corresponding source
 
-The complete Windows frontend and packaging source for this build is available at:
-https://github.com/KuiDaXElaina/SwooshDrop/tree/v0.3.6-custom.2
+This is an unreleased development build. It is not a published beta installer.
+Windows frontend, packaging, protocol patches, build scripts, configuration,
+retained licenses and pinned dependency revisions for this integration are at:
+https://github.com/AlbinoPriest/swooshdrop/tree/integrate-kuida-contributions
 
-The corresponding source archive for the bundled OWL, Linux kernel modules,
-RTL8188EU driver changes, WinDrop protocol patch, build scripts, configuration,
-and retained license texts is published with the same release at:
-https://github.com/KuiDaXElaina/SwooshDrop/releases/tag/v0.3.6-custom.2
+Build the complete corresponding-source.tar.gz archive with:
+  bash scripts/build-corresponding-source.sh
+The archive includes OWL, Linux kernel and driver sources and every WinDrop
+protocol patch listed in patches/series, with build instructions.
 
-The source archive is distributed as a separate release asset instead of being
-embedded in the Windows setup executable. It is available at no charge from the
-same release page as the installer.
+Before distributing a release installer, publish its matching archive as a
+separate release asset at no charge on the same release page as the installer:
+https://github.com/AlbinoPriest/swooshdrop/releases
+Do not distribute this preview installer without its corresponding sources.

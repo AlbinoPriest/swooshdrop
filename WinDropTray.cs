@@ -28,8 +28,8 @@ using Forms = System.Windows.Forms;
 [assembly: AssemblyTitle("SwooshDrop")]
 [assembly: AssemblyDescription("Receive AirDrop photos, files, and web links on Windows")]
 [assembly: AssemblyProduct("SwooshDrop")]
-[assembly: AssemblyVersion("0.3.6.2")]
-[assembly: AssemblyFileVersion("0.3.6.2")]
+[assembly: AssemblyVersion("0.3.7.0")]
+[assembly: AssemblyFileVersion("0.3.7.0")]
 
 public class TransferItem : INotifyPropertyChanged
 {
@@ -89,6 +89,9 @@ public sealed class WinDropTray
     Dictionary<string, object> incoming;
     DateTime deadline;
     string incomingPreview, lastSender, pendingTransferFailure;
+    string activeReceiveConnection, pendingFailureConnection;
+    sealed class ReceiveMetadata { public string Sender; public string Preview; }
+    readonly Dictionary<string, ReceiveMetadata> receiveMetadata = new Dictionary<string, ReceiveMetadata>();
     Window popup;
     Window flyout;
     DateTime ignoreTrayClicksUntil;
@@ -313,8 +316,9 @@ public sealed class WinDropTray
         transferFailureDelay.Tick += delegate
         {
             transferFailureDelay.Stop();
-            string reason = pendingTransferFailure; pendingTransferFailure = null;
-            if (transferInProgress && !string.IsNullOrEmpty(reason)) RecoverFromTransferFailure(reason);
+            string reason = pendingTransferFailure, connection = pendingFailureConnection;
+            pendingTransferFailure = null; pendingFailureConnection = null;
+            if (transferInProgress && !string.IsNullOrEmpty(reason) && connection == activeReceiveConnection) RecoverFromTransferFailure(reason, connection);
         };
         if (!render) logRefresh.Start();
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
@@ -374,8 +378,8 @@ public sealed class WinDropTray
         RefreshDeviceInstructions();
         Page(currentPage); UpdateCount();
         var transfers = Find<ItemsControl>("Transfers"); if (transfers != null) transfers.Items.Refresh();
-        if (!busy && incoming == null)
-            SetStatus(I18n.Text(ownsSession ? "Ready to receive" : "Receiving is off"), ownsSession ? I18n.Format("On iPhone: Share → AirDrop → {0}. Discovery may take a moment.", settings.DeviceName) : I18n.Text("Start receiving whenever you're ready."), ownsSession);
+        if (!busy && incoming == null && !transferInProgress)
+            SetStatus(I18n.Text(Find<TextBlock>("StatusText").Text), I18n.Text(Find<TextBlock>("StatusDetail").Text), receiverReady);
         UpdateTrayFlyout();
     }
 
@@ -1006,9 +1010,8 @@ public sealed class WinDropTray
             else if (kind == "log")
             {
                 string message = Convert.ToString(item["message"]); Log(message);
-                string reason;
-                if (transferInProgress && TransferFailurePolicy.TryDescribe(message, out reason)) QueueTransferFailure(I18n.Text(reason));
             }
+            else if (kind == "transfer-failed") HandleReceiveFailure(item);
             else if (kind == "consent") ReceiveConsent(item);
             else if (kind == "progress") UpdateTransferProgress(item);
             else if (kind == "completed") Complete(item);
@@ -1017,6 +1020,8 @@ public sealed class WinDropTray
     }
     static string[] Strings(Dictionary<string, object> item, string key)
     { var result = new List<string>(); object value; if (item.TryGetValue(key, out value) && value is IEnumerable && !(value is string)) foreach (object entry in (IEnumerable)value) if (entry is string) result.Add((string)entry); return result.ToArray(); }
+    static string ReceiveConnection(Dictionary<string, object> item)
+    { object value; return item != null && item.TryGetValue("connection", out value) ? Convert.ToString(value) : null; }
     void ReceiveConsent(Dictionary<string, object> item)
     {
         if (incoming != null) Decide(false);
@@ -1072,6 +1077,7 @@ public sealed class WinDropTray
     {
         if (incoming == null) return;
         string sender = Convert.ToString(incoming["sender"]);
+        string connection = ReceiveConnection(incoming);
         string[] files = Strings(incoming, "files"), links = Strings(incoming, "links");
         string id = Convert.ToString(incoming["id"]); if (DateTime.UtcNow >= deadline) accepted = false;
         try { if (receiver != null && !receiver.HasExited) receiver.StandardInput.WriteLine(json.Serialize(new { id = id, accept = accepted })); }
@@ -1080,6 +1086,8 @@ public sealed class WinDropTray
         Find<Border>("PendingBanner").Visibility = Visibility.Collapsed;
         if (accepted)
         {
+            CancelPendingTransferFailure(); activeReceiveConnection = connection;
+            if (!string.IsNullOrEmpty(connection)) receiveMetadata[connection] = new ReceiveMetadata { Sender = sender, Preview = incomingPreview };
             string name = links.Length > 0 ? links[0] : files.Length > 0 ? files[0] : I18n.Text("Preparing transfer…");
             ShowTransferProgress(sender, name, 0, Math.Max(files.Length, links.Length), 0, 0, true);
         }
@@ -1088,11 +1096,13 @@ public sealed class WinDropTray
 
     void UpdateTransferProgress(Dictionary<string, object> item)
     {
+        string connection = ReceiveConnection(item);
+        if (!string.IsNullOrEmpty(connection) && !receiveMetadata.ContainsKey(connection)) return;
         CancelPendingTransferFailure();
+        activeReceiveConnection = connection;
         string sender = Convert.ToString(item["sender"]), file = Convert.ToString(item["file"]);
         int index = Convert.ToInt32(item["index"]), count = Convert.ToInt32(item["count"]);
         long received = Convert.ToInt64(item["received"]), total = Convert.ToInt64(item["total"]);
-        lastSender = sender;
         ShowTransferProgress(sender, file, index, count, received, total, false);
     }
 
@@ -1116,24 +1126,36 @@ public sealed class WinDropTray
             : I18n.Format("File {0} of {1} · {2}% · {3} / {4}", Math.Max(1, index), Math.Max(1, count), percent.ToString("0", I18n.Culture), FormatBytes(received), FormatBytes(total));
     }
 
-    void RecoverFromTransferFailure(string reason)
+    void HandleReceiveFailure(Dictionary<string, object> item)
+    {
+        string connection = ReceiveConnection(item);
+        if (string.IsNullOrEmpty(connection)) return;
+        string reason;
+        TransferFailurePolicy.TryDescribe("Connection failed: " + Convert.ToString(item["message"]), out reason);
+        if (connection == ReceiveConnection(incoming)) ClearPendingRequest();
+        if (transferInProgress && connection == activeReceiveConnection) QueueTransferFailure(I18n.Text(reason), connection);
+        else receiveMetadata.Remove(connection);
+    }
+
+    void RecoverFromTransferFailure(string reason, string connection)
     {
         CancelPendingTransferFailure();
         Log("Transfer recovery: " + reason);
-        ClearPendingRequest();
+        if (connection == ReceiveConnection(incoming)) ClearPendingRequest();
+        receiveMetadata.Remove(connection); activeReceiveConnection = null;
         ShowTransferFailure(reason);
-        SetStatus(I18n.Text("Ready to receive again"), I18n.Format("The last transfer stopped: {0} SwooshDrop is still receiving.", reason), true);
+        if (incoming == null) SetStatus(I18n.Text("Ready to receive again"), I18n.Format("The last transfer stopped: {0} SwooshDrop is still receiving.", reason), receiverReady);
     }
 
-    void QueueTransferFailure(string reason)
+    void QueueTransferFailure(string reason, string connection)
     {
-        pendingTransferFailure = reason;
+        pendingTransferFailure = reason; pendingFailureConnection = connection;
         transferFailureDelay.Stop(); transferFailureDelay.Start();
     }
 
     void CancelPendingTransferFailure()
     {
-        transferFailureDelay.Stop(); pendingTransferFailure = null;
+        transferFailureDelay.Stop(); pendingTransferFailure = null; pendingFailureConnection = null;
     }
 
     void ShowTransferFailure(string reason)
@@ -1167,6 +1189,7 @@ public sealed class WinDropTray
     {
         CancelPendingTransferFailure();
         transferInProgress = false;
+        activeReceiveConnection = null; receiveMetadata.Clear();
         progressDismiss.Stop(); HideTransferCard();
         if (clearPreview) ClearPendingRequest();
     }
@@ -1186,8 +1209,12 @@ public sealed class WinDropTray
 
     void Complete(Dictionary<string, object> eventItem)
     {
-        CancelPendingTransferFailure();
-        transferInProgress = false;
+        string connection = ReceiveConnection(eventItem);
+        bool current = string.IsNullOrEmpty(connection) || connection == activeReceiveConnection;
+        if (current) { CancelPendingTransferFailure(); transferInProgress = false; activeReceiveConnection = null; }
+        ReceiveMetadata metadata;
+        if (string.IsNullOrEmpty(connection) || !receiveMetadata.TryGetValue(connection, out metadata)) metadata = new ReceiveMetadata { Sender = lastSender, Preview = incomingPreview };
+        if (!string.IsNullOrEmpty(connection)) receiveMetadata.Remove(connection);
         string[] files = Strings(eventItem, "files"), links = Strings(eventItem, "links");
         var added = new List<TransferItem>();
         foreach (string linux in files)
@@ -1195,18 +1222,21 @@ public sealed class WinDropTray
             string path = WindowsPath(linux); if (!File.Exists(path)) continue;
             var file = new FileInfo(path);
             if (links.Length > 0)
-                foreach (string link in links) added.Add(new TransferItem { Id = Guid.NewGuid().ToString("N"), Path = path, Name = link, Link = link, Sender = lastSender ?? "AirDrop", Bytes = file.Length, ReceivedAt = DateTime.UtcNow });
-            else added.Add(new TransferItem { Id = Guid.NewGuid().ToString("N"), Path = path, Name = file.Name, Sender = lastSender ?? "AirDrop", Bytes = file.Length, ReceivedAt = DateTime.UtcNow });
+                foreach (string link in links) added.Add(new TransferItem { Id = Guid.NewGuid().ToString("N"), Path = path, Name = link, Link = link, Sender = metadata.Sender ?? "AirDrop", Bytes = file.Length, ReceivedAt = DateTime.UtcNow });
+            else added.Add(new TransferItem { Id = Guid.NewGuid().ToString("N"), Path = path, Name = file.Name, Sender = metadata.Sender ?? "AirDrop", Bytes = file.Length, ReceivedAt = DateTime.UtcNow });
         }
-        if (added.Count > 0 && links.Length == 0) added[0].PreviewPath = incomingPreview;
+        if (added.Count > 0 && links.Length == 0) added[0].PreviewPath = metadata.Preview;
         foreach (var item in added) items.Insert(0, item);
         while (items.Count > 500) items.RemoveAt(items.Count - 1);
-        SaveHistory(); UpdateCount(); SetStatus(I18n.Text("Ready for your next drop"), I18n.Format("Saved to {0}", settings.SaveFolder), true);
+        SaveHistory(); UpdateCount();
+        if (current && incoming == null) SetStatus(I18n.Text("Ready for your next drop"), I18n.Format("Saved to {0}", settings.SaveFolder), receiverReady);
+        if (current) {
         var progress = Find<ProgressBar>("TransferProgressBar"); progress.IsIndeterminate = false; progress.Value = 100;
         Find<TextBlock>("TransferProgressDetail").Text = I18n.Text("Transfer complete");
         progressDismiss.Stop(); progressDismiss.Interval = TimeSpan.FromSeconds(2); progressDismiss.Start();
-        Notify(I18n.Text(links.Length > 0 ? "Link received" : "AirDrop received"), links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), incomingPreview, null, null);
-        incomingPreview = null; QueueMissingPreviews();
+        }
+        Notify(I18n.Text(links.Length > 0 ? "Link received" : "AirDrop received"), links.Length > 0 ? string.Join("\n", links) : string.Join(", ", Array.ConvertAll(added.ToArray(), entry => entry.Name)), metadata.Preview, null, null);
+        if (incoming == null) incomingPreview = null; QueueMissingPreviews();
         if (settings.OpenLinksOnReceive && added.Count > 0)
             foreach (string link in new HashSet<string>(links, StringComparer.Ordinal))
                 try { OpenLink(link); Log("Opened an accepted web link in the default browser."); }
