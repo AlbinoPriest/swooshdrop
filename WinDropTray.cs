@@ -41,7 +41,8 @@ public class Preferences
     public bool OpenLinksOnReceive { get; set; }
     public string RuntimeDistro { get; set; }
     public string AdapterInstanceId { get; set; }
-    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SwooshDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; RuntimeDistro = "WinDropRuntime"; }
+    public bool AutomaticUpdates { get; set; }
+    public Preferences() { SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SwooshDrop"); ReceiveOnLaunch = true; Notifications = true; OpenLinksOnReceive = true; RuntimeDistro = "WinDropRuntime"; AutomaticUpdates = true; }
 }
 
 public class TransferItem : INotifyPropertyChanged
@@ -60,6 +61,12 @@ public class TransferItem : INotifyPropertyChanged
     public string Detail { get { return ReceivedAt.ToLocalTime().ToString("MMM d · HH:mm") + "  ·  " + (Bytes >= 1048576 ? (Bytes / 1048576.0).ToString("0.0") + " MB" : (Bytes / 1024.0).ToString("0") + " KB"); } }
     public event PropertyChangedEventHandler PropertyChanged;
     public static bool IsPhoto(string path) { string ext = System.IO.Path.GetExtension(path ?? "").ToLowerInvariant(); return Array.IndexOf(new string[] { ".heic", ".heif", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp" }, ext) >= 0; }
+}
+
+public class OutgoingPeer
+{
+    public string Id { get; set; }
+    public string Name { get; set; }
 }
 
 public sealed class WinDropTray
@@ -81,6 +88,10 @@ public sealed class WinDropTray
     readonly DispatcherTimer expiry = new DispatcherTimer();
     readonly DispatcherTimer trayClickDelay = new DispatcherTimer();
     readonly DispatcherTimer logRefresh = new DispatcherTimer();
+    readonly DispatcherTimer updateTimer = new DispatcherTimer();
+    UpdateResult latestRelease;
+    bool checkingUpdates;
+    DateTime lastUpdateAttempt;
     Preferences settings;
     Process receiver;
     string control, bus, token, sessionDevice;
@@ -92,6 +103,12 @@ public sealed class WinDropTray
     Window flyout;
     DateTime ignoreTrayClicksUntil;
     string currentPage = "Received";
+    readonly ObservableCollection<OutgoingPeer> outgoingPeers = new ObservableCollection<OutgoingPeer>();
+    string[] outgoingFiles = new string[0];
+    bool outgoingBusy;
+    CancellationTokenSource outgoingPreparation;
+    AirDropWake outgoingWake;
+    readonly DispatcherTimer wakeExpiry = new DispatcherTimer();
 
     [STAThread]
     public static void Main(string[] args)
@@ -120,7 +137,7 @@ public sealed class WinDropTray
                 else
                 {
                     string page = Option(args, "--render-page");
-                    if (page == "Received" || page == "Settings" || page == "About") app.Page(page);
+                    if (page == "Received" || page == "Send" || page == "Settings" || page == "About") app.Page(page);
                     app.window.Show(); app.Render(app.window, Option(args, "--render"));
                 }
                 app.quitting = true; application.Shutdown(); return;
@@ -149,6 +166,7 @@ public sealed class WinDropTray
             finally
             {
                 app.tray.Dispose();
+                app.StopOutgoingWake();
                 if (app.activeTrayIcon != null) app.activeTrayIcon.Dispose();
                 if (app.pausedTrayIcon != null) app.pausedTrayIcon.Dispose();
                 ToastActivation.UnregisterServer(toastCookie);
@@ -195,6 +213,27 @@ public sealed class WinDropTray
         Find<ItemsControl>("Transfers").ItemsSource = items;
         UpdateCount();
         Find<Button>("ReceivedNav").Click += delegate { Page("Received"); };
+        Find<Button>("SendNav").Click += delegate { Page("Send"); };
+        Find<ListBox>("SendPeersCombo").ItemsSource = outgoingPeers;
+        Find<ListBox>("SendPeersCombo").SelectionChanged += delegate { RefreshOutgoingControls(); };
+        Find<Button>("ChooseSendFilesButton").Click += delegate
+        {
+            var picker = new OpenFileDialog { Title = "Choose files to AirDrop", Multiselect = true, CheckFileExists = true };
+            if (picker.ShowDialog(window) == true) SelectOutgoingFiles(picker.FileNames);
+        };
+        Find<Border>("SendDropZone").DragOver += delegate(object sender, DragEventArgs e)
+        { e.Effects = !outgoingBusy && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
+        Find<Border>("SendDropZone").Drop += delegate(object sender, DragEventArgs e)
+        { if (!outgoingBusy && e.Data.GetDataPresent(DataFormats.FileDrop)) SelectOutgoingFiles((string[])e.Data.GetData(DataFormats.FileDrop)); e.Handled = true; };
+        Find<Button>("SearchPeersButton").Click += async delegate { await SearchOutgoingPeers(); };
+        Find<Button>("SendFilesButton").Click += async delegate { await SendOutgoingFiles(); };
+        Find<Button>("CancelOutgoingButton").Click += delegate
+        {
+            StopOutgoingWake();
+            if (outgoingPreparation != null) outgoingPreparation.Cancel();
+            try { WriteOutgoingCommand(new { op = "cancel-outgoing" }); }
+            catch (Exception ex) { Log("Cancel outgoing: " + ex.Message); }
+        };
         Find<Button>("SettingsNav").Click += delegate { Page("Settings"); };
         Find<Button>("AboutNav").Click += delegate { Page("About"); };
         Find<Button>("FolderButton").Click += delegate { OpenFolder(); };
@@ -220,6 +259,22 @@ public sealed class WinDropTray
         Find<CheckBox>("OpenLinksCheck").IsChecked = settings.OpenLinksOnReceive;
         Find<TextBlock>("SaveFolderText").Text = settings.SaveFolder;
         loadingSettings = false;
+        latestRelease = Read<UpdateResult>("updates.json");
+        if (latestRelease != null && (UpdateChecker.ParseVersion(latestRelease.Version) == null || !UpdateChecker.IsReleaseUrl(latestRelease.ReleaseUrl) || latestRelease.CheckedUtc > DateTime.UtcNow)) latestRelease = null;
+        Find<TextBlock>("InstalledVersionText").Text = "Installed version " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + " · beta releases included";
+        Find<CheckBox>("AutomaticUpdatesCheck").IsChecked = settings.AutomaticUpdates;
+        RefreshUpdateView(null);
+        Find<CheckBox>("AutomaticUpdatesCheck").Click += async delegate
+        {
+            settings.AutomaticUpdates = Find<CheckBox>("AutomaticUpdatesCheck").IsChecked == true; SaveSettings();
+            if (settings.AutomaticUpdates) await CheckForUpdates(false);
+        };
+        Find<Button>("CheckUpdatesButton").Click += async delegate { await CheckForUpdates(true); };
+        Find<Button>("DownloadUpdateButton").Click += delegate
+        {
+            if (latestRelease != null && UpdateChecker.IsReleaseUrl(latestRelease.ReleaseUrl)) OpenLink(latestRelease.ReleaseUrl);
+        };
+        Find<Button>("UpdateNoticeButton").Click += delegate { ShowWindow(); Page("Settings"); };
         Find<CheckBox>("AutostartCheck").Click += delegate
         {
             if (loadingSettings) return;
@@ -245,6 +300,9 @@ public sealed class WinDropTray
         window.Closing += delegate(object sender, CancelEventArgs e) { if (!quitting) { e.Cancel = true; window.Hide(); } };
         if (!render)
         {
+            updateTimer.Interval = TimeSpan.FromSeconds(30);
+            updateTimer.Tick += async delegate { updateTimer.Interval = TimeSpan.FromHours(1); await CheckForUpdates(false); };
+            updateTimer.Start();
             activeTrayIcon = LoadTrayIcon("AppIcon.ico");
             pausedTrayIcon = LoadTrayIcon("TrayPaused.ico");
             UpdateTrayIcon();
@@ -252,6 +310,7 @@ public sealed class WinDropTray
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Open SwooshDrop", null, delegate { ShowWindow(); });
             menu.Items.Add("Open received folder", null, delegate { OpenFolder(); });
+            menu.Items.Add("Check for updates", null, async delegate { ShowWindow(); Page("Settings"); await CheckForUpdates(true); });
             menu.Items.Add("Start receiving", null, async delegate { receivingIntent = true; await StartReceiving(); });
             menu.Items.Add("Stop receiving", null, async delegate { receivingIntent = false; await StopReceiving(); });
             menu.Items.Add("Quit", null, async delegate { if (busy) return; receivingIntent = false; await StopReceiving(); if (ownsSession) return; quitting = true; tray.Dispose(); Application.Current.Shutdown(); });
@@ -265,10 +324,45 @@ public sealed class WinDropTray
         }
     }
 
+    void RefreshUpdateView(string status)
+    {
+        Version available = latestRelease == null ? null : UpdateChecker.ParseVersion(latestRelease.Version);
+        bool newer = available != null && available > Assembly.GetExecutingAssembly().GetName().Version && UpdateChecker.IsReleaseUrl(latestRelease.ReleaseUrl);
+        Find<TextBlock>("UpdateStatusText").Text = status ?? (newer ? "Version " + latestRelease.Version.TrimStart('v') + " is available." : latestRelease == null ? "Check for a new version whenever you're ready." : "You're up to date.");
+        Find<TextBlock>("UpdateCheckedText").Text = latestRelease == null ? "" : "Last successful check: " + latestRelease.CheckedUtc.ToLocalTime().ToString("MMM d, HH:mm");
+        Find<Button>("DownloadUpdateButton").Visibility = newer ? Visibility.Visible : Visibility.Collapsed;
+        Find<Button>("UpdateNoticeButton").Visibility = newer ? Visibility.Visible : Visibility.Collapsed;
+        Find<Button>("CheckUpdatesButton").IsEnabled = !checkingUpdates;
+        Find<Button>("CheckUpdatesButton").Content = checkingUpdates ? "Checking…" : "Check for updates";
+    }
+
+    async Task CheckForUpdates(bool manual)
+    {
+        if (quitting || rendering || checkingUpdates) return;
+        if (!manual && (!settings.AutomaticUpdates || DateTime.UtcNow - lastUpdateAttempt < TimeSpan.FromHours(24) ||
+            (latestRelease != null && DateTime.UtcNow - latestRelease.CheckedUtc < TimeSpan.FromHours(24)))) return;
+        checkingUpdates = true; lastUpdateAttempt = DateTime.UtcNow;
+        RefreshUpdateView("Checking for updates…");
+        try
+        {
+            UpdateResult result = await Task.Run(() => UpdateChecker.Check());
+            if (quitting) return;
+            latestRelease = result;
+            try { Write("updates.json", result); } catch (IOException ex) { Log("Update cache: " + ex.Message); }
+            RefreshUpdateView(null);
+            Log("Update check: latest downloadable version " + result.Version);
+        }
+        catch (Exception ex)
+        {
+            if (!quitting) { RefreshUpdateView("Couldn't check for updates. Try again when you're online."); Log("Update check failed: " + ex.Message); }
+        }
+        finally { checkingUpdates = false; if (!quitting) { Find<Button>("CheckUpdatesButton").IsEnabled = true; Find<Button>("CheckUpdatesButton").Content = "Check for updates"; } }
+    }
+
     void Page(string name)
     {
         bool changed = currentPage != name;
-        foreach (string page in new string[] { "Received", "Settings", "About" })
+        foreach (string page in new string[] { "Received", "Send", "Settings", "About" })
         {
             ((UIElement)window.FindName(page + "Page")).Visibility = page == name ? Visibility.Visible : Visibility.Collapsed;
             var nav = Find<Button>(page + "Nav");
@@ -278,8 +372,8 @@ public sealed class WinDropTray
         }
         var title = Find<TextBlock>("PageTitleText");
         var subtitle = Find<TextBlock>("PageSubtitleText");
-        if (title != null) title.Text = name == "Received" ? "Your latest arrivals." : name == "Settings" ? "Make it yours." : "About SwooshDrop.";
-        if (subtitle != null) subtitle.Text = name == "Received" ? "Photos, files and links. Right here." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
+        if (title != null) title.Text = name == "Received" ? "Your latest arrivals." : name == "Send" ? "Out the window." : name == "Settings" ? "Make it yours." : "About SwooshDrop.";
+        if (subtitle != null) subtitle.Text = name == "Received" ? "Photos, files and links. Right here." : name == "Send" ? "Send original files to a nearby device." : name == "Settings" ? "Choose how SwooshDrop runs and where files go." : "Project information and licenses.";
         if (name == "Settings") RefreshLogView();
         currentPage = name;
         if (changed) AnimateEntrance(Find<FrameworkElement>(name + "Page"), 8, 180);
@@ -397,6 +491,7 @@ public sealed class WinDropTray
     void SetStatus(string title, string detail, bool ready)
     {
         receiverReady = ready;
+        RefreshOutgoingControls();
         Find<TextBlock>("StatusText").Text = title; Find<TextBlock>("StatusDetail").Text = detail;
         Find<System.Windows.Shapes.Ellipse>("StatusDot").Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ready ? "#F39485" : "#737780"));
         Find<Button>("ReceiveButton").Content = ownsSession ? "Stop receiving" : "Start receiving";
@@ -531,6 +626,132 @@ public sealed class WinDropTray
     string Wsl(params string[] args) { var all = new List<string> { "-d", settings.RuntimeDistro, "-u", "root", "--exec" }; all.AddRange(args); return Run("wsl.exe", all.ToArray()); }
     string LinuxPath(string path) { return Wsl("wslpath", "-u", path); }
 
+    void RefreshOutgoingControls()
+    {
+        Find<Button>("ChooseSendFilesButton").IsEnabled = !outgoingBusy;
+        Find<Button>("SearchPeersButton").IsEnabled = !outgoingBusy;
+        Find<ListBox>("SendPeersCombo").IsEnabled = !outgoingBusy;
+        Find<Button>("CancelOutgoingButton").IsEnabled = outgoingBusy && receiverReady;
+        Find<Button>("SendFilesButton").IsEnabled = !outgoingBusy && receiverReady && outgoingFiles.Length > 0 && Find<ListBox>("SendPeersCombo").SelectedItem != null;
+    }
+
+    void SelectOutgoingFiles(string[] paths)
+    {
+        if (outgoingBusy) return;
+        try
+        {
+            if (paths.Length == 0 || paths.Length > 100) throw new Exception("Choose between 1 and 100 files.");
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            long bytes = 0;
+            foreach (string path in paths)
+            {
+                if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new Exception("Choose regular files. Folders and shortcuts aren't supported yet.");
+                if (!names.Add(Path.GetFileName(path))) throw new Exception("Files with the same name must be sent separately.");
+                bytes += new FileInfo(path).Length;
+            }
+            outgoingFiles = (string[])paths.Clone();
+            Find<TextBlock>("SendFilesText").Text = string.Join(", ", Array.ConvertAll(paths, Path.GetFileName)) + "\n" + paths.Length + " file(s) · " + (bytes / 1048576.0).ToString("0.##") + " MB";
+            Find<TextBlock>("OutgoingStatusText").Text = "Find your iPhone, then select it before sending.";
+        }
+        catch (Exception ex) { Find<TextBlock>("OutgoingStatusText").Text = ex.Message; }
+        RefreshOutgoingControls();
+    }
+
+    void WriteOutgoingCommand(object command)
+    {
+        if (!receiverReady || receiver == null || receiver.HasExited) throw new Exception("Start receiving to connect your adapter, then try again.");
+        receiver.StandardInput.WriteLine(json.Serialize(command));
+    }
+
+    async Task SearchOutgoingPeers()
+    {
+        if (outgoingBusy || rendering) return;
+        outgoingBusy = true; RefreshOutgoingControls(); outgoingPeers.Clear();
+        Find<ProgressBar>("OutgoingProgress").Value = 0;
+        Find<TextBlock>("OutgoingStatusText").Text = "Connecting the adapter…";
+        try
+        {
+            if (!ownsSession) { receivingIntent = true; await StartReceiving(); }
+            DateTime until = DateTime.UtcNow.AddSeconds(30);
+            while (ownsSession && !receiverReady && DateTime.UtcNow < until) await Task.Delay(200);
+            StartOutgoingWake(32);
+            WriteOutgoingCommand(new { op = "browse" });
+            RefreshOutgoingControls();
+        }
+        catch (Exception ex) { StopOutgoingWake(); outgoingBusy = false; Find<TextBlock>("OutgoingStatusText").Text = ex.Message; RefreshOutgoingControls(); }
+    }
+
+    void WakeExpired(object sender, EventArgs args) { StopOutgoingWake(); }
+    void StartOutgoingWake(int seconds)
+    {
+        StopOutgoingWake();
+        try
+        {
+            outgoingWake = new AirDropWake(delegate(string message) { OnUi(delegate
+            {
+                Log(message);
+                if (message.Contains("Aborted")) Find<TextBlock>("OutgoingStatusText").Text = "Bluetooth wake-up failed. Turn on Bluetooth on this PC, then try again.";
+            }); });
+            wakeExpiry.Interval = TimeSpan.FromSeconds(seconds);
+            wakeExpiry.Tick -= WakeExpired; wakeExpiry.Tick += WakeExpired; wakeExpiry.Start();
+        }
+        catch (Exception ex) { Log("Bluetooth wake unavailable: " + ex.Message); }
+    }
+    void StopOutgoingWake()
+    {
+        wakeExpiry.Stop();
+        if (outgoingWake == null) return;
+        try { outgoingWake.Dispose(); } catch (Exception ex) { Log("Bluetooth wake cleanup: " + ex.Message); }
+        outgoingWake = null;
+    }
+
+    async Task SendOutgoingFiles()
+    {
+        var peer = Find<ListBox>("SendPeersCombo").SelectedItem as OutgoingPeer;
+        if (outgoingBusy || peer == null || outgoingFiles.Length == 0 || rendering) return;
+        outgoingBusy = true; RefreshOutgoingControls();
+        outgoingPreparation = new CancellationTokenSource();
+        string[] files = (string[])outgoingFiles.Clone();
+        Find<TextBlock>("OutgoingStatusText").Text = "Preparing your files…";
+        Find<ProgressBar>("OutgoingProgress").Value = 0;
+        try
+        {
+            StartOutgoingWake(300);
+            Find<TextBlock>("OutgoingStatusText").Text = "Waking your device…";
+            await Task.Delay(1500, outgoingPreparation.Token);
+            string[] paths = await Task.Run(delegate { return Array.ConvertAll(files, LinuxPath); });
+            outgoingPreparation.Token.ThrowIfCancellationRequested();
+            WriteOutgoingCommand(new { op = "send", peer = peer.Id, paths = paths });
+        }
+        catch (Exception ex) { StopOutgoingWake(); outgoingBusy = false; Find<TextBlock>("OutgoingStatusText").Text = ex is OperationCanceledException ? "Sending cancelled." : ex.Message; RefreshOutgoingControls(); }
+        finally { outgoingPreparation.Dispose(); outgoingPreparation = null; }
+    }
+
+    void HandleOutgoingEvent(string kind, Dictionary<string, object> item)
+    {
+        if (kind == "outgoing-peer")
+        {
+            Log("Outgoing discovery: found a recipient.");
+            outgoingPeers.Add(new OutgoingPeer { Id = Convert.ToString(item["id"]), Name = Convert.ToString(item["name"]) });
+            Find<TextBlock>("OutgoingStatusText").Text = "Found " + outgoingPeers.Count + " device(s). Search finishes after 30 seconds; Cancel ends it sooner.";
+        }
+        else if (kind == "outgoing-progress")
+        {
+            double sent = Convert.ToDouble(item["sent"]), total = Convert.ToDouble(item["total"]);
+            Find<ProgressBar>("OutgoingProgress").Value = total > 0 ? Math.Min(99, sent * 100 / total) : 0;
+            Find<TextBlock>("OutgoingStatusText").Text = "Sending… " + (sent / 1048576).ToString("0.##") + " / " + (total / 1048576).ToString("0.##") + " MB";
+        }
+        else if (kind == "outgoing-sent")
+        {
+            Find<ProgressBar>("OutgoingProgress").Value = 100;
+            Find<TextBlock>("OutgoingStatusText").Text = "Sent " + Convert.ToString(item["count"]) + " file(s).";
+            Log("Outgoing transfer completed: " + Convert.ToString(item["count"]) + " files, " + Convert.ToString(item["bytes"]) + " bytes.");
+        }
+        else if (kind == "outgoing-idle") { StopOutgoingWake(); outgoingBusy = false; }
+        else if (item.ContainsKey("message")) { Find<TextBlock>("OutgoingStatusText").Text = Convert.ToString(item["message"]); Log("Outgoing: " + Convert.ToString(item["message"])); }
+        RefreshOutgoingControls();
+    }
+
     async Task StartReceiving()
     {
         if (busy || ownsSession || rendering) return;
@@ -584,6 +805,11 @@ public sealed class WinDropTray
     async Task StopReceiving()
     {
         if (busy || !ownsSession) return;
+        StopOutgoingWake();
+        if (outgoingPreparation != null) outgoingPreparation.Cancel();
+        try { WriteOutgoingCommand(new { op = "cancel-outgoing" }); } catch (Exception) { }
+        outgoingBusy = false; outgoingPeers.Clear();
+        Find<TextBlock>("OutgoingStatusText").Text = "Adapter disconnected. Find devices again to send.";
         busy = true; Decide(false); SetStatus("Stopping…", "Returning the adapter to Windows.", false);
         try
         {
@@ -617,6 +843,7 @@ public sealed class WinDropTray
         try
         {
             var item = json.Deserialize<Dictionary<string, object>>(line); string kind = Convert.ToString(item["kind"]);
+            if (kind.StartsWith("outgoing-", StringComparison.Ordinal)) { HandleOutgoingEvent(kind, item); return; }
             if (kind == "ready") SetStatus("Ready to receive", "On iPhone: Share → AirDrop → SwooshDrop. Discovery may take a moment.", true);
             else if (kind == "log") Log(Convert.ToString(item["message"]));
             else if (kind == "consent") ReceiveConsent(item);
@@ -777,6 +1004,7 @@ public sealed class WinDropTray
         Uri uri; if (!Uri.TryCreate(activation, UriKind.Absolute, out uri) || uri.Scheme != "windrop") return;
         Log("Notification activation: " + uri.Host);
         if (uri.Host == "show") { ShowWindow(); return; }
+        if (uri.Host == "send") { ShowWindow(); Page("Send"); return; }
         if (uri.Host == "quit") { QuitFromActivation(); return; }
         if (incoming == null) return;
         string expected = "?id=" + Convert.ToString(incoming["id"]);

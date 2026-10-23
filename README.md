@@ -59,6 +59,8 @@ In the current source build, the tray icon is a grey outline with a transparent 
 - **Pick your approval style:** Windows notifications or the integrated SwooshDrop popup.
 - **Choose your save folder** and whether accepted links open automatically.
 - **Read live logs** in Settings, with Activity, Radio, and Bridge views.
+- **Try sending files back** from the current source build's Send page: choose files, find nearby devices, select a recipient, then approve on the iPhone. Uses the same adapter and runtime as receiving. Outgoing transfers are experimental and have passed local protocol tests; real-iPhone sending is awaiting validation. Not included in the published 0.3.6 installer.
+- **Check for updates** in Settings or the tray menu. The current source build quietly checks GitHub once a day, includes beta releases, and offers a release-page download when a newer installer is available. Automatic checks can be disabled; nothing installs automatically.
 - **Pause the receiver** to return the adapter to Windows and stop the dedicated Linux runtime. Other WSL distributions remain running.
 
 Tempo Soft uses charcoal surfaces, soft coral accents, rounded controls, and editorial headings. Short hover, page, and popup animations respect Windows’ animation setting.

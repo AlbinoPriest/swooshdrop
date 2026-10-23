@@ -167,8 +167,10 @@
     <TextBlock Text="YOUR SPACE" Foreground="#B2B0B0" FontSize="10" Margin="9,0,0,0"/>
     <StackPanel Grid.Row="1" Margin="0,37,0,0">
      <Button x:Name="ReceivedNav" Content="Received" HorizontalContentAlignment="Left" Background="#292D33" Foreground="#F1EDE8" BorderBrush="#F39485" BorderThickness="0" Margin="0,0,0,6" Padding="11,12"/>
+     <Button x:Name="SendNav" Content="Send" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B2B0B0" BorderThickness="0" Margin="0,0,0,6" Padding="14,12"/>
      <Button x:Name="SettingsNav" Content="Settings" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B2B0B0" BorderThickness="0" Margin="0,0,0,6" Padding="14,12"/>
      <Button x:Name="AboutNav" Content="About" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#B2B0B0" BorderThickness="0" Padding="14,12"/>
+     <Button x:Name="UpdateNoticeButton" Content="Update available ↗" Visibility="Collapsed" FontSize="11" Margin="0,16,0,0" Padding="10,10" Foreground="#F39485"/>
     </StackPanel>
     <StackPanel Grid.Row="3">
      <Border BorderBrush="#363A41" BorderThickness="0,1,0,0" Padding="4,16,0,0">
@@ -265,8 +267,55 @@
       </Grid>
      </ScrollViewer>
     </Grid>
+    <ScrollViewer x:Name="SendPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+     <StackPanel Margin="0,0,13,0">
+      <Border x:Name="SendDropZone" AllowDrop="True" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="18" Padding="18">
+       <StackPanel>
+        <Grid>
+         <StackPanel Margin="0,0,135,0">
+          <TextBlock Text="Something to send?" FontFamily="Georgia" FontSize="20"/>
+          <TextBlock Text="Drop files here. Originals stay unchanged." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,5,0,0"/>
+         </StackPanel>
+         <Button x:Name="ChooseSendFilesButton" Content="Choose files…" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+        </Grid>
+        <TextBlock x:Name="SendFilesText" Text="No files selected" TextWrapping="Wrap" MaxHeight="36" Margin="0,12,0,0" FontSize="12"/>
+       </StackPanel>
+      </Border>
+      <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="18" Padding="18" Margin="0,12,0,0">
+       <StackPanel>
+        <TextBlock Text="A nearby destination." FontFamily="Georgia" FontSize="20"/>
+        <TextBlock Text="Keep your iPhone unlocked, with Wi-Fi, Bluetooth and AirDrop → Everyone for 10 Minutes on." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" FontSize="12" Margin="0,6,0,10"/>
+        <StackPanel Orientation="Horizontal">
+         <Button x:Name="SearchPeersButton" Content="Find devices"/>
+         <Button x:Name="CancelOutgoingButton" Content="Cancel" IsEnabled="False" Margin="9,0,0,0"/>
+        </StackPanel>
+        <ListBox x:Name="SendPeersCombo" DisplayMemberPath="Name" SelectedValuePath="Id" Margin="0,10,0,0" MinHeight="36" MaxHeight="78" FontSize="13" Background="#292D33" Foreground="#F1EDE8" BorderBrush="#363A41">
+         <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="10,8"/><Setter Property="Foreground" Value="#F1EDE8"/><Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#69504C"/><Setter Property="Foreground" Value="#FFFFFF"/></Trigger></Style.Triggers></Style></ListBox.ItemContainerStyle>
+        </ListBox>
+        <TextBlock Text="Check your recipient. Nearby devices supply their own names." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,10"/>
+        <Button x:Name="SendFilesButton" Content="Send to device ↗" IsEnabled="False" HorizontalAlignment="Left" Background="#F39485" Foreground="#17191C"/>
+        <TextBlock x:Name="OutgoingStatusText" Text="Experimental: start with a small file." TextWrapping="Wrap" Margin="0,10,0,0" FontSize="12"/>
+        <ProgressBar x:Name="OutgoingProgress" Minimum="0" Maximum="100" Value="0" Height="4" Foreground="#F39485" Background="#363A41" BorderThickness="0" Margin="0,10,0,0"/>
+       </StackPanel>
+      </Border>
+     </StackPanel>
+    </ScrollViewer>
     <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
      <StackPanel Margin="0,0,13,0">
+      <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" Margin="0,0,0,14" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+       <StackPanel>
+        <TextBlock Text="Updates" FontFamily="Georgia" FontSize="20"/>
+        <TextBlock x:Name="InstalledVersionText" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,12"/>
+        <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap" FontSize="13"/>
+        <TextBlock x:Name="UpdateCheckedText" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+        <StackPanel Orientation="Horizontal" Margin="0,14,0,12">
+         <Button x:Name="CheckUpdatesButton" Content="Check for updates"/>
+         <Button x:Name="DownloadUpdateButton" Content="Download update ↗" Visibility="Collapsed" Margin="9,0,0,0" Background="#F39485" Foreground="#17191C"/>
+        </StackPanel>
+        <CheckBox x:Name="AutomaticUpdatesCheck" Content="Automatically check once a day"/>
+        <TextBlock Text="Downloads open on GitHub. Updates are installed only when you choose." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="27,3,0,0"/>
+       </StackPanel>
+      </Border>
       <Border Background="{StaticResource SurfaceBrush}" CornerRadius="18" Padding="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
        <StackPanel>
         <TextBlock Text="Startup" FontFamily="Georgia" FontSize="20" Margin="0,0,0,8"/>
