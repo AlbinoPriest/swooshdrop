@@ -1,16 +1,16 @@
-SwooshDrop 0.3.7 integration preview - corresponding source
+SwooshDrop 0.3.7 beta - corresponding source
 
-This is an unreleased development build. It is not a published beta installer.
-Windows frontend, packaging, protocol patches, build scripts, configuration,
-retained licenses and pinned dependency revisions for this integration are at:
-https://github.com/AlbinoPriest/swooshdrop/tree/integrate-kuida-contributions
+The Windows frontend, packaging, protocol patches, build scripts,
+configuration, retained licenses and pinned revisions for this build are at:
+https://github.com/AlbinoPriest/swooshdrop/tree/v0.3.7
 
-Build the complete corresponding-source.tar.gz archive with:
+The matching corresponding-source.tar.gz archive is provided at no charge
+as a separate release asset on the same release page as the installer:
+https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.7
+https://github.com/AlbinoPriest/swooshdrop/releases/download/v0.3.7/corresponding-source.tar.gz
+
+It includes OWL, Linux kernel and driver sources and every WinDrop protocol
+patch listed in patches/series, with build instructions. Apply the complete
+patch series in order. The archive can be generated with:
   bash scripts/build-corresponding-source.sh
-The archive includes OWL, Linux kernel and driver sources and every WinDrop
-protocol patch listed in patches/series, with build instructions.
-
-Before distributing a release installer, publish its matching archive as a
-separate release asset at no charge on the same release page as the installer:
-https://github.com/AlbinoPriest/swooshdrop/releases
-Do not distribute this preview installer without its corresponding sources.
+Original component licenses and copyright notices are retained.

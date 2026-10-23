@@ -236,7 +236,7 @@ public sealed class SetupWindow : Form
         Text = "SwooshDrop Setup"; ClientSize = new Size(760, 600); MinimumSize = MaximumSize = Size; StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(247, 249, 253); Font = new Font("Segoe UI", 10); FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
         title.Text = "AirDrop, meet your PC."; title.Font = new Font("Segoe UI", 24, FontStyle.Bold); title.SetBounds(32, 26, 700, 52);
-        subtitle.Text = "SwooshDrop · 0.3.7.0 preview\nReceive original photos, files, and links from your iPhone."; subtitle.SetBounds(34, 86, 690, 52);
+        subtitle.Text = "SwooshDrop · 0.3.7 beta\nReceive original photos, files, and links from your iPhone."; subtitle.SetBounds(34, 86, 690, 52);
         hardware.Text = "Use a dedicated USB Wi-Fi adapter. SwooshDrop reserves it while receiving.\nWindows 10/11 x64 · Internet for setup · Compatible USB required."; hardware.SetBounds(34, 157, 690, 70);
         check.Text = "1  Check prerequisites"; check.SetBounds(34, 228, 245, 42);
         adapters.SetBounds(34, 290, 690, 32); adapters.DropDownStyle = ComboBoxStyle.DropDownList;

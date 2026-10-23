@@ -21,7 +21,7 @@
 
 <img src="docs/images/received.png" alt="SwooshDrop’s charcoal and coral interface showing demo photos, a web link, and a PDF in its received-files list" width="100%">
 
-**Preview of the current `main` branch**, using demo files and illustrative thumbnails. The Tempo Soft design, Through icon, and new tray behavior are included in source; the downloadable **0.3.6 beta** currently uses the earlier interface.
+**SwooshDrop 0.3.7 beta**, shown with demo files and illustrative thumbnails. Includes the Tempo Soft design, Through icon, receive progress and configurable receiver settings.
 
 | From your iPhone | On your PC |
 | :--- | :--- |
@@ -62,7 +62,7 @@ In the current source build, the tray icon is a grey outline with a transparent 
 - **Switch the interface between English and Traditional Chinese (zh-TW).**
 - Choose whether accepted links open automatically.
 - **Read live logs** in Settings, with Activity, Radio, and Bridge views.
-- **Try sending files back** from the current source build's Send page: choose files, find nearby devices, select a recipient, then approve on the iPhone. Uses the same adapter and runtime as receiving. Outgoing transfers are experimental and have passed local protocol tests; real-iPhone sending is awaiting validation. Not included in the published 0.3.6 installer.
+- **Try sending files back** from the current source build's Send page: choose files, find nearby devices, select a recipient, then approve on the iPhone. Uses the same adapter and runtime as receiving. Outgoing transfers are experimental and have passed local protocol tests; real-iPhone sending is awaiting validation. Included as an experimental feature in 0.3.7; successful PC-to-iPhone delivery has not been demonstrated.
 - **Check for updates** in Settings or the tray menu. The current source build quietly checks GitHub once a day, includes beta releases, and offers a release-page download when a newer installer is available. Automatic checks can be disabled; nothing installs automatically.
 - **Pause the receiver** to return the adapter to Windows and stop the dedicated Linux runtime. Other WSL distributions remain running.
 
@@ -88,7 +88,7 @@ Fresh installations save to **Downloads\SwooshDrop**. Upgrades keep your chosen 
 
 The adapter catalog includes **86 USB device IDs** with bundled Realtek and MediaTek drivers. All except the tested ID are experimental. Built-in PCI Wi-Fi, sharing Windows’ active Wi-Fi adapter, ARM/32-bit PCs, arbitrary adapters, and Contacts Only are unsupported.
 
-This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The published 0.3.6 installer is approximately **256 MiB** and includes corresponding source materials. The upcoming source build uses a smaller installer and distributes corresponding source as a separate asset; setup downloads Ubuntu and runtime packages separately.
+This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The **0.3.7 installer is approximately 4 MiB**, with the matching corresponding-source archive available separately on the same release page. Setup downloads Ubuntu and runtime packages separately.
 
 **Still a beta.** Discovery can be intermittent. Fresh second-PC and Windows 10 installs, sustained throughput, Live Photos, metadata fidelity, and experimental adapters need more testing. Builds are unsigned. [What has been tested →](docs/VALIDATION.md)
 

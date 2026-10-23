@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.7 integration preview (unreleased)
+## 0.3.7 beta — 2026-10-23
 
 ### Contributions from KuiDaXElaina
 
@@ -20,4 +20,4 @@ Integrated [KuiDaXElaina's six original commits](https://github.com/KuiDaXElaina
 - Preserve existing experimental sending, Bluetooth wake-up and update-check work.
 - Keep official download links on AlbinoPriest/swooshdrop and credit upstream contributors explicitly.
 
-This preview is not a published release. PC-to-iPhone sending remains experimental: discovery works in hardware tests, but delivery to the test iPhone has not been validated. Fresh receiving tests on the combined build and second-PC installation tests are still needed before release.
+PC-to-iPhone sending remains experimental: discovery works in hardware tests, but delivery to the test iPhone has not been validated. Fresh receiving tests on the combined build and second-PC installation tests remain unverified in this beta.
