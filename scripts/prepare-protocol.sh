@@ -22,11 +22,9 @@ cmake -S "$lab/owl" -B "$lab/owl/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$lab/owl/build" -j 4
 
 checkout "$lab/windrop" https://github.com/UvejsGj/WinDrop.git 5a5dc52ce6eda298789622cb92d548d64d5673cc
-if ! git -C "$lab/windrop" apply --reverse --check "$repo/patches/prototype-changes.patch" 2>/dev/null; then
-    git -C "$lab/windrop" apply --check "$repo/patches/prototype-changes.patch"
-    git -C "$lab/windrop" apply "$repo/patches/prototype-changes.patch"
-fi
-dotnet build "$lab/windrop/src/WinDrop.Cli/WinDrop.Cli.csproj" -c Release -o "$lab/receiver-product"
+# Apply the complete series to a clean pinned archive on every build. Checking
+# individual reverse patches is unreliable when later patches edit their context.
+bash "$repo/scripts/build-product-backend.sh"
 mkdir -p "$lab/receiver-refresh"
 cp "$lab/receiver-product/"* "$lab/receiver-refresh/"
 

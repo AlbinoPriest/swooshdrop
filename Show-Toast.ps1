@@ -15,7 +15,10 @@ if ($request.image -and (Test-Path -LiteralPath $request.image)) {
 }
 if ($request.id) {
     $actions = $document.CreateElement('actions'); $toast.AppendChild($actions) | Out-Null
-    foreach ($verb in @('Accept','Decline')) { $action = $document.CreateElement('action'); $action.SetAttribute('content',$verb); $action.SetAttribute('activationType','foreground'); $action.SetAttribute('arguments',('windrop://' + $verb.ToLowerInvariant() + '?id=' + $request.id)); $actions.AppendChild($action) | Out-Null }
+    foreach ($item in @(@{ Verb='Accept'; Label=[string]$request.accept },@{ Verb='Decline'; Label=[string]$request.decline })) {
+        $label = if ($item.Label) { $item.Label } else { $item.Verb }
+        $action = $document.CreateElement('action'); $action.SetAttribute('content',$label); $action.SetAttribute('activationType','foreground'); $action.SetAttribute('arguments',('windrop://' + $item.Verb.ToLowerInvariant() + '?id=' + $request.id)); $actions.AppendChild($action) | Out-Null
+    }
 }
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument; $xml.LoadXml($document.OuterXml)
 $notification = [Windows.UI.Notifications.ToastNotification]::new($xml)

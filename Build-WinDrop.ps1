@@ -8,8 +8,20 @@ New-Item -ItemType Directory -Force $output,$build | Out-Null
 $iconPng = Join-Path $build 'AppIcon.png'
 $iconFile = Join-Path $build 'AppIcon.ico'
 $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
+$windowsMetadata = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\UnionMetadata\*\Windows.winmd' | Sort-Object FullName | Select-Object -First 1
+if (-not $windowsMetadata) { throw 'Windows 10/11 SDK metadata is required to build Bluetooth discovery.' }
 $arguments = @('/nologo','/target:winexe','/platform:x64','/optimize+',('/out:' + (Join-Path $output 'SwooshDrop.exe')),('/win32manifest:' + (Join-Path $PSScriptRoot 'app.manifest')),('/win32icon:' + $iconFile))
 foreach ($assembly in @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Web.Extensions.dll','System.Xaml.dll','WPF\WindowsBase.dll','WPF\PresentationCore.dll','WPF\PresentationFramework.dll')) { $arguments += '/reference:' + (Join-Path $framework $assembly) }
+foreach ($contract in @('Windows.Foundation.UniversalApiContract','Windows.Foundation.FoundationContract')) {
+    $contractPath = Get-ChildItem (Join-Path ('C:\Program Files (x86)\Windows Kits\10\References\' + $windowsMetadata.Directory.Name) ($contract + '\*\' + $contract + '.winmd')) | Sort-Object FullName -Descending | Select-Object -First 1
+    if (-not $contractPath) { throw "Missing Windows SDK contract: $contract" }
+    $arguments += '/reference:' + $contractPath.FullName
+}
+$arguments += '/reference:' + (Join-Path $framework 'System.Runtime.WindowsRuntime.dll')
+$arguments += '/reference:' + (Join-Path $framework 'System.Runtime.InteropServices.WindowsRuntime.dll')
+$runtimeFacade = Get-ChildItem 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.*\Facades\System.Runtime.dll' | Sort-Object FullName -Descending | Select-Object -First 1
+if (-not $runtimeFacade) { throw '.NET Framework targeting pack is required to build Bluetooth discovery.' }
+$arguments += '/reference:' + $runtimeFacade.FullName
 foreach ($resource in @('airdrop-lab.sh','airdrop-lab-control.sh','render-preview.py','Show-Toast.ps1')) { $arguments += '/resource:' + (Join-Path $PSScriptRoot $resource) + ',Runtime.' + $resource }
 foreach ($file in @('windrop.dll','windrop.deps.json','windrop.runtimeconfig.json','WinDrop.Protocol.dll')) {
     $path = Join-Path $BackendDirectory $file
@@ -26,7 +38,8 @@ $arguments += '/resource:' + (Join-Path $build 'ThroughPath.txt') + ',UI.Through
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'LICENSE') + ',Notices.App-LICENSE.txt'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'licenses\WinDrop-LICENSE.txt') + ',Notices.Protocol-LICENSE.txt'
 $arguments += '/resource:' + (Join-Path $PSScriptRoot 'adapters.json') + ',Config.adapters.json'
-$arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'ToastActivation.cs'),(Join-Path $PSScriptRoot 'AdapterCatalog.cs')
+$arguments += (Join-Path $PSScriptRoot 'WinDropTray.cs'),(Join-Path $PSScriptRoot 'AppFeatures.cs'),(Join-Path $PSScriptRoot 'NativeIntegration.cs'),(Join-Path $PSScriptRoot 'ToastActivation.cs'),(Join-Path $PSScriptRoot 'AdapterCatalog.cs'),(Join-Path $PSScriptRoot 'UpdateChecker.cs')
+$arguments += (Join-Path $PSScriptRoot 'AirDropWake.cs')
 & (Join-Path $framework 'csc.exe') @arguments
 if ($LASTEXITCODE -ne 0) { throw 'SwooshDrop compilation failed.' }
 Get-Item (Join-Path $output 'SwooshDrop.exe') | Select-Object FullName,Length

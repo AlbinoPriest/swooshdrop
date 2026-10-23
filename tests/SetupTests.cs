@@ -12,6 +12,8 @@ public static class SetupTests
         {
             string serial = @"USB\VID_0BDA&PID_8179\00E04C0001", location = @"USB\VID_148F&PID_7601\6&42D09BA&0&1";
             string catalog = SetupEngine.ResourceText("Setup.adapters.json");
+            string sourceOffer = SetupEngine.ResourceText("Setup.SOURCE-OFFER.txt");
+            Assert(sourceOffer.Contains("github.com/AlbinoPriest/swooshdrop") && sourceOffer.Contains("separate release asset") && sourceOffer.Contains("patches/series"), "Corresponding-source offer is missing or stale");
             Assert(AdapterIdentity.Parse(serial).Serial == "00E04C0001", "Real USB serial was lost");
             Assert(AdapterIdentity.Parse(location).Serial == "", "Windows location token must not become a USB serial");
             Assert(AdapterCatalog.Profile(serial.ToLowerInvariant(), catalog).Driver == "8188eu", "Tested chipset must use the validated driver");

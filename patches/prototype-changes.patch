@@ -1,5 +1,5 @@
 diff --git a/src/WinDrop.Cli/Program.cs b/src/WinDrop.Cli/Program.cs
-index b749151..eed26bc 100644
+index b749151..962de59 100644
 --- a/src/WinDrop.Cli/Program.cs
 +++ b/src/WinDrop.Cli/Program.cs
 @@ -1,6 +1,10 @@
@@ -64,7 +64,7 @@ index b749151..eed26bc 100644
      });
  
      await using IAirDropTransport transport = CreateTransport(args);
-@@ -117,45 +125,46 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
+@@ -117,45 +125,48 @@ static async Task<int> ReceiveAsync(string[] args, CancellationToken ct)
      // 8770. The SRV record carries the port, so browsers find it wherever it listens.
      int port = int.TryParse(ArgumentValue(args, "--port"), out int requested) ? requested : AirDropServiceRecord.DefaultPort;
  
@@ -92,6 +92,8 @@ index b749151..eed26bc 100644
 -        // One connection at a time is deliberate: a consent prompt on the console cannot
 -        // sensibly be answered for two senders at once.
 -        try
++    if (uiEvents) UiInput.CommandHandler = new OutgoingController(transport, EmitUi, ct).Command;
++
 +    await ConcurrentReceiver.RunAsync(
 +        transport.AcceptAsync(record.Port, ct),
 +        async (raw, token) =>
@@ -135,7 +137,7 @@ index b749151..eed26bc 100644
  
      return 0;
  }
-@@ -177,8 +186,56 @@ static Task<bool> AutoAcceptAsync(AirDropAskRequest request, CancellationToken c
+@@ -177,8 +188,56 @@ static Task<bool> AutoAcceptAsync(AirDropAskRequest request, CancellationToken c
      return Task.FromResult(true);
  }
  
@@ -192,7 +194,7 @@ index b749151..eed26bc 100644
      // Only the size and the signature. Decoding it would mean pointing an image codec at
      // a stranger's bytes from a console tool that has nothing to show them on.
      if (request.FileIcon is { } icon)
-@@ -441,3 +498,42 @@ static string? ArgumentValue(string[] args, string name)
+@@ -441,3 +500,44 @@ static string? ArgumentValue(string[] args, string name)
      int index = Array.FindIndex(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
      return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
  }
@@ -201,6 +203,7 @@ index b749151..eed26bc 100644
 +// sessions must not steal each other's Accept/Decline responses.
 +static class UiInput
 +{
++    public static Action<JsonElement>? CommandHandler { get; set; }
 +    private static readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> Pending = new();
 +
 +    static UiInput()
@@ -215,6 +218,7 @@ index b749151..eed26bc 100644
 +                    {
 +                        using var json = JsonDocument.Parse(line);
 +                        var root = json.RootElement;
++                        if (root.TryGetProperty("op", out _)) { CommandHandler?.Invoke(root); continue; }
 +                        string? id = root.GetProperty("id").GetString();
 +                        bool accepted = root.GetProperty("accept").GetBoolean();
 +                        if (id is not null && Pending.TryGetValue(id, out var waiter))
@@ -236,7 +240,7 @@ index b749151..eed26bc 100644
 +    }
 +}
 diff --git a/src/WinDrop.Protocol/AirDropMessages.cs b/src/WinDrop.Protocol/AirDropMessages.cs
-index 324d8fa..0574cbc 100644
+index 324d8fa..1c55bce 100644
 --- a/src/WinDrop.Protocol/AirDropMessages.cs
 +++ b/src/WinDrop.Protocol/AirDropMessages.cs
 @@ -1,3 +1,5 @@
@@ -245,31 +249,40 @@ index 324d8fa..0574cbc 100644
  namespace WinDrop.Protocol;
  
  /// <summary>
-@@ -57,7 +59,8 @@ public sealed record AirDropAskRequest(
+@@ -57,7 +59,9 @@ public sealed record AirDropAskRequest(
      string BundleId,
      IReadOnlyList<AirDropFileEntry> Files,
      bool ConvertMediaFormats = false,
 -    byte[]? FileIcon = null)
 +    byte[]? FileIcon = null,
-+    IReadOnlyList<string>? Items = null)
++    IReadOnlyList<string>? Items = null,
++    string? TransferId = null)
  {
      public const string FinderBundleId = "com.apple.finder";
  
-@@ -79,6 +82,7 @@ public sealed record AirDropAskRequest(
+@@ -77,8 +81,14 @@ public sealed record AirDropAskRequest(
+         // absent key is what opendrop sends when it has nothing to show, so it is the
+         // shape a receiver is known to cope with; a zero-length image has been seen from
          // nobody.
++        if (!string.IsNullOrEmpty(TransferId))
++        {
++            plist["TransferID"] = new Dictionary<string, object?> { ["id"] = TransferId };
++            plist["TransferType"] = new Dictionary<string, object?> { ["files"] = new Dictionary<string, object?>() };
++        }
          if (FileIcon is { Length: > 0 })
              plist["FileIcon"] = FileIcon;
 +        if (Items is { Count: > 0 }) plist["Items"] = Items.Cast<object?>().ToList();
  
          return plist;
      }
-@@ -105,7 +109,23 @@ public sealed record AirDropAskRequest(
+@@ -105,7 +115,24 @@ public sealed record AirDropAskRequest(
              ConvertMediaFormats: plist.GetValueOrDefault("ConvertMediaFormats") is true,
              // Anything other than a data object is dropped, not coerced: a string here is
              // not an image in some other spelling, it is a peer sending nonsense.
 -            FileIcon: plist.GetValueOrDefault("FileIcon") as byte[]);
 +            FileIcon: plist.GetValueOrDefault("FileIcon") as byte[],
-+            Items: ReadLinks(plist));
++            Items: ReadLinks(plist),
++            TransferId: plist.GetValueOrDefault("TransferID") is IReadOnlyDictionary<string, object?> transfer ? transfer.GetValueOrDefault("id") as string : null);
 +    }
 +
 +    private static IReadOnlyList<string> ReadLinks(IReadOnlyDictionary<string, object?> plist)
@@ -409,10 +422,14 @@ index b0ac419..12f6fff 100644
 +    }
  }
 diff --git a/src/WinDrop.Protocol/Discovery/BridgeTransport.cs b/src/WinDrop.Protocol/Discovery/BridgeTransport.cs
-index 68e7ebb..9a7d670 100644
+index 68e7ebb..0209a1e 100644
 --- a/src/WinDrop.Protocol/Discovery/BridgeTransport.cs
 +++ b/src/WinDrop.Protocol/Discovery/BridgeTransport.cs
-@@ -60,6 +60,7 @@ public sealed class BridgeTransport : IAirDropTransport
+@@ -57,9 +57,11 @@ public sealed class BridgeTransport : IAirDropTransport
+ 
+     private readonly Channel<AirDropPeer> _discovered = Channel.CreateUnbounded<AirDropPeer>();
+     private readonly Channel<Stream> _inbound = Channel.CreateUnbounded<Stream>();
++    private readonly object _discoveryGate = new();
      private readonly ServiceAssembler _assembler = new("bridge");
      private readonly CancellationTokenSource _shutdown = new();
      private readonly SemaphoreSlim _startGate = new(1, 1);
@@ -420,7 +437,7 @@ index 68e7ebb..9a7d670 100644
  
      private TcpClient? _control;
      private StreamWriter? _controlWriter;
-@@ -103,7 +104,9 @@ public sealed class BridgeTransport : IAirDropTransport
+@@ -103,7 +105,9 @@ public sealed class BridgeTransport : IAirDropTransport
              // to hand inbound connections, and it needs to know that port up front.
              // Any, not Loopback: the bridge is a different machine and has to be
              // able to dial back. Dual-mode so it can reach us over either family.
@@ -431,7 +448,7 @@ index 68e7ebb..9a7d670 100644
              _reverse.Server.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
              _reverse.Start();
              int reversePort = ((IPEndPoint)_reverse.LocalEndpoint).Port;
-@@ -150,7 +153,9 @@ public sealed class BridgeTransport : IAirDropTransport
+@@ -150,7 +154,9 @@ public sealed class BridgeTransport : IAirDropTransport
      {
          if (_controlWriter is null) throw new BridgeException("Control connection is not open.");
  
@@ -442,7 +459,7 @@ index 68e7ebb..9a7d670 100644
      }
  
      private async Task ControlLoopAsync(StreamReader reader, CancellationToken ct)
-@@ -198,9 +203,9 @@ public sealed class BridgeTransport : IAirDropTransport
+@@ -198,16 +204,17 @@ public sealed class BridgeTransport : IAirDropTransport
              return; // the AWDL link carries other mDNS traffic too
          }
  
@@ -454,7 +471,17 @@ index 68e7ebb..9a7d670 100644
              return;
          }
  
-@@ -242,7 +247,13 @@ public sealed class BridgeTransport : IAirDropTransport
+         // Interface index 0: the address is scoped to the bridge's interface, not to
+         // anything on this machine, and we never dial it directly — the bridge does.
+-        foreach (AirDropPeer peer in _assembler.Absorb(message, 0))
+-            _discovered.Writer.TryWrite(peer);
++        lock (_discoveryGate)
++            foreach (AirDropPeer peer in _assembler.Absorb(message, 0))
++                _discovered.Writer.TryWrite(peer);
+     }
+ 
+     private async Task ReverseLoopAsync(TcpListener listener, CancellationToken ct)
+@@ -242,7 +249,13 @@ public sealed class BridgeTransport : IAirDropTransport
  
          await AnnounceAsync(record, ct);
  
@@ -469,7 +496,7 @@ index 68e7ebb..9a7d670 100644
      }
  
      private Task AnnounceAsync(AirDropServiceRecord record, CancellationToken ct)
-@@ -256,12 +267,40 @@ public sealed class BridgeTransport : IAirDropTransport
+@@ -256,12 +269,40 @@ public sealed class BridgeTransport : IAirDropTransport
          return SendDatagramAsync(announcement, ct);
      }
  
@@ -514,6 +541,18 @@ index 68e7ebb..9a7d670 100644
          }
      }
  
+@@ -275,6 +316,11 @@ public sealed class BridgeTransport : IAirDropTransport
+     public async IAsyncEnumerable<AirDropPeer> BrowseAsync([EnumeratorCancellation] CancellationToken ct = default)
+     {
+         await EnsureStartedAsync(ct);
++        lock (_discoveryGate)
++        {
++            _assembler.Reset();
++            while (_discovered.Reader.TryRead(out _)) { }
++        }
+ 
+         _ = Task.Run(async () =>
+         {
 diff --git a/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs b/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
 index 38535a0..846ab09 100644
 --- a/tests/WinDrop.Protocol.Tests/AirDropFlowTests.cs
@@ -886,14 +925,15 @@ index 0000000..c64e340
 +    }
 +}
 diff --git a/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj b/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj
-index feac118..a5f4822 100644
+index feac118..b29ee84 100644
 --- a/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj
 +++ b/tests/WinDrop.Protocol.Tests/WinDrop.Protocol.Tests.csproj
-@@ -22,6 +22,7 @@
+@@ -22,6 +22,8 @@
  
    <ItemGroup>
      <ProjectReference Include="..\..\src\WinDrop.Protocol\WinDrop.Protocol.csproj" />
 +    <Compile Include="..\..\src\WinDrop.Cli\ConcurrentReceiver.cs" Link="ConcurrentReceiver.cs" />
++    <Compile Include="..\..\src\WinDrop.Cli\OutgoingController.cs" Link="OutgoingController.cs" />
    </ItemGroup>
  
    <ItemGroup>
@@ -1065,3 +1105,462 @@ index 0000000..49c914d
 +
 +if __name__ == "__main__":
 +    unittest.main()
+diff --git a/src/WinDrop.Protocol/Discovery/ServiceAssembler.cs b/src/WinDrop.Protocol/Discovery/ServiceAssembler.cs
+index e80f7b7..8d41d60 100644
+--- a/src/WinDrop.Protocol/Discovery/ServiceAssembler.cs
++++ b/src/WinDrop.Protocol/Discovery/ServiceAssembler.cs
+@@ -31,6 +31,8 @@ public sealed class ServiceAssembler(string transportName)
+     /// <summary>Instance name we advertise ourselves, so we never report ourselves as a peer.</summary>
+     public string? OwnInstance { get; set; }
+ 
++    public void Reset() { _pending.Clear(); _reported.Clear(); }
++
+     /// <summary>
+     /// Folds one message in and returns any peers that became complete as a result.
+     /// The interface index is carried through because a link-local address is not
+diff --git a/src/WinDrop.Protocol/AirDropSender.cs b/src/WinDrop.Protocol/AirDropSender.cs
+index 3085f5e..f276124 100644
+--- a/src/WinDrop.Protocol/AirDropSender.cs
++++ b/src/WinDrop.Protocol/AirDropSender.cs
+@@ -99,6 +99,8 @@ public sealed class AirDropSenderSession : IAsyncDisposable
+     private readonly HttpConnection _connection;
+     private readonly AirDropReceiverFlags _peerFlags;
+     private bool _accepted;
++    private string? _transferId;
++    public Action<string>? Log { get; set; }
+ 
+     public AirDropSenderSession(Stream tlsStream, AirDropReceiverFlags peerFlags, bool ownsStream = false)
+     {
+@@ -132,11 +134,15 @@ public sealed class AirDropSenderSession : IAsyncDisposable
+     /// <summary>Asks for consent. False means the user declined; the session cannot upload.</summary>
+     public async Task<bool> AskAsync(AirDropAskRequest request, CancellationToken ct = default)
+     {
+-        await PostPlistAsync("/Ask", BinaryPlistWriter.Write(request.ToPlist()), ct);
++        _accepted = false;
++        _transferId = request.TransferId ?? Guid.NewGuid().ToString().ToUpperInvariant();
++        await PostPlistAsync("/Ask", BinaryPlistWriter.Write((request with { TransferId = _transferId }).ToPlist()), ct);
++        Log?.Invoke("Ask request sent; waiting for response headers.");
+ 
+         HttpResponseHead response = await _connection.ReadResponseHeadAsync(ct);
+         await _connection.ReadBodyAsync(response.Headers, 1024 * 1024, ct);
+ 
++        Log?.Invoke($"Ask response: {response.StatusCode} {response.ReasonPhrase}");
+         _accepted = response.IsSuccess;
+         return _accepted;
+     }
+@@ -155,7 +161,11 @@ public sealed class AirDropSenderSession : IAsyncDisposable
+             throw new InvalidOperationException("Upload attempted before /Ask was accepted.");
+ 
+         var headers = new HttpHeaders();
+-        headers.Set("Content-Type", "application/x-cpio");
++        headers.Set("Content-Type", UsesDvZip ? "application/x-dvzip" : "application/x-cpio");
++        headers.Set("TransferID", _transferId!);
++        headers.Set("TotalBytes", files.Sum(f => f.TotalBytes).ToString(System.Globalization.CultureInfo.InvariantCulture));
++        headers.Set("User-Agent", "AirDrop/1.0");
++        headers.Set("Connection", "keep-alive");
+ 
+         // Say which encoding was used rather than leaving the receiver to infer it. Note
+         // a real peer may send nothing here at all — opendrop does not — so a receiver
+@@ -216,6 +226,8 @@ public sealed class AirDropSenderSession : IAsyncDisposable
+     {
+         var headers = new HttpHeaders();
+         headers.Set("Content-Type", "application/octet-stream");
++        headers.Set("User-Agent", "AirDrop/1.0");
++        headers.Set("Connection", "keep-alive");
+ 
+         return _connection.WriteRequestAsync("POST", target, headers, body, ct);
+     }
+diff --git a/src/WinDrop.Cli/OutgoingController.cs b/src/WinDrop.Cli/OutgoingController.cs
+new file mode 100644
+--- /dev/null
++++ b/src/WinDrop.Cli/OutgoingController.cs
+@@ -0,0 +1,153 @@
++using System.Collections.Concurrent;
++using System.Security.Cryptography.X509Certificates;
++using System.Text.Json;
++using WinDrop.Protocol;
++using WinDrop.Protocol.Discovery;
++using WinDrop.Protocol.Tls;
++
++namespace WinDrop.Cli;
++
++// Shares the receiver's transport: opening a second BridgeTransport would replace
++// the bridge controller and interrupt incoming transfers.
++public sealed class OutgoingController(IAirDropTransport transport, Action<object> emit, CancellationToken lifetime)
++{
++    private readonly ConcurrentDictionary<string, (AirDropPeer Peer, DateTime Seen)> peers = new();
++    private CancellationTokenSource? operation;
++    private readonly object gate = new();
++
++    public void Command(JsonElement command)
++    {
++        string? op = command.GetProperty("op").GetString();
++        lock (gate)
++        {
++            if (op == "cancel-outgoing") { operation?.Cancel(); return; }
++            if (operation != null) { emit(new { kind = "outgoing-error", message = "Another outgoing operation is running." }); return; }
++            if (op != "browse" && op != "send") return;
++            operation = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
++            operation.CancelAfter(op == "browse" ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(5));
++            var snapshot = command.Clone();
++            var active = operation;
++            _ = Task.Run(async () =>
++            {
++                try
++                {
++                    if (op == "browse") await BrowseAsync(active.Token);
++                    else await SendAsync(snapshot, active.Token);
++                }
++                catch (OperationCanceledException) { emit(new { kind = "outgoing-status", message = op == "browse" ? "Search finished. Choose a device, or search again." : "Sending cancelled or timed out." }); }
++                catch (Exception ex) { emit(new { kind = "outgoing-error", message = ex.Message }); }
++                finally
++                {
++                    lock (gate) { operation = null; active.Dispose(); }
++                    emit(new { kind = "outgoing-idle" });
++                }
++            });
++        }
++    }
++
++    private async Task BrowseAsync(CancellationToken ct)
++    {
++        peers.Clear();
++        emit(new { kind = "outgoing-status", message = "Looking for nearby devices…" });
++        await foreach (var peer in transport.BrowseAsync(ct))
++        {
++            string key = peer.InstanceName;
++            if (!peers.TryAdd(key, (peer, DateTime.UtcNow))) continue;
++            string name = peer.InstanceName;
++            // Resolve the human-readable name, but a sleepy phone must not stall
++            // discovery indefinitely. Keep its service name as a fallback.
++            using var probe = CancellationTokenSource.CreateLinkedTokenSource(ct);
++            probe.CancelAfter(TimeSpan.FromSeconds(3));
++            try
++            {
++                using var certificate = AirDropCertificate.CreateSelfSigned("SwooshDrop");
++                await using var raw = await transport.ConnectAsync(peer, probe.Token);
++                await using var ssl = await AirDropTls.AuthenticateAsClientAsync(raw, certificate, probe.Token);
++                await using var session = new AirDropSenderSession(ssl, peer.Flags);
++                var identity = await session.DiscoverAsync(probe.Token);
++                if (!string.IsNullOrWhiteSpace(identity?.ComputerName)) name = identity.ComputerName;
++            }
++            catch (Exception) when (!ct.IsCancellationRequested) { }
++            emit(new { kind = "outgoing-peer", id = key, name });
++        }
++    }
++
++    private async Task SendAsync(JsonElement command, CancellationToken ct)
++    {
++        string key = command.GetProperty("peer").GetString() ?? "";
++        if (!peers.TryGetValue(key, out var target) || DateTime.UtcNow - target.Seen > TimeSpan.FromMinutes(2))
++            throw new InvalidOperationException("This device is no longer current. Search again before sending.");
++        string[] paths = command.GetProperty("paths").EnumerateArray().Select(p => p.GetString() ?? "").ToArray();
++        ValidateFiles(paths);
++        var files = paths.Select(p => new AirDropOutgoingFile(p, Path.GetFileName(p), FileType(p))).ToList();
++        long total = files.Sum(f => f.TotalBytes);
++        using var certificate = AirDropCertificate.CreateSelfSigned("SwooshDrop");
++        emit(new { kind = "outgoing-status", message = "Connecting to your device…" });
++        await using var raw = await ConnectForSendAsync(target.Peer, ct);
++        await using var ssl = await AirDropTls.AuthenticateAsClientAsync(raw, certificate, ct);
++        await using var session = new AirDropSenderSession(ssl, target.Peer.Flags);
++        session.Log = message => emit(new { kind = "log", message = "Sender: " + message });
++        // Discovery already resolved the selected recipient on a separate probe.
++        // Start this transfer connection with /Ask, as OpenDrop does. Reusing
++        // /Discover's connection is not required for the outgoing transfer.
++        var request = new AirDropAskRequest("SwooshDrop", "Windows", Guid.NewGuid().ToString(),
++            AirDropAskRequest.FinderBundleId, files.Select(f => f.ToEntry()).ToList());
++        emit(new { kind = "outgoing-status", message = "Requesting approval from your iPhone…" });
++        using var consent = CancellationTokenSource.CreateLinkedTokenSource(ct);
++        consent.CancelAfter(TimeSpan.FromSeconds(90));
++        bool accepted;
++        try { accepted = await session.AskAsync(request, consent.Token); }
++        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new TimeoutException("The iPhone did not answer the AirDrop request within 90 seconds."); }
++        if (!accepted) throw new InvalidOperationException("The device declined this transfer.");
++        emit(new { kind = "outgoing-status", message = "Sending original files…" });
++        await session.UploadAsync(files, new TransferProgress(sent => emit(new { kind = "outgoing-progress", sent, total })), ct);
++        emit(new { kind = "outgoing-sent", count = paths.Length, bytes = total });
++    }
++
++    public static void ValidateFiles(string[] paths)
++    {
++        if (paths.Length == 0 || paths.Length > 100) throw new ArgumentException("Choose between 1 and 100 files.");
++        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
++        foreach (string path in paths)
++        {
++            if (!Path.IsPathFullyQualified(path) || !File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
++                throw new ArgumentException("Choose existing regular files; folders and shortcuts are not supported yet.");
++            if (!names.Add(Path.GetFileName(path))) throw new ArgumentException("Files with the same name must be sent separately.");
++        }
++    }
++
++    private async Task<Stream> ConnectForSendAsync(AirDropPeer peer, CancellationToken ct)
++    {
++        for (int attempt = 0; ; attempt++)
++        {
++            try { return await transport.ConnectAsync(peer, ct); }
++            catch (Exception ex) when (attempt < 2 && !ct.IsCancellationRequested &&
++                ex is BridgeException or IOException or System.Net.Sockets.SocketException)
++            {
++                // Retry only opening TCP, before TLS, consent or file bytes. A
++                // waking receiver can briefly refuse connections; uploads must
++                // never be retried automatically after an ambiguous outcome.
++                emit(new { kind = "outgoing-status", message = "Waiting for your device to wake…" });
++                await Task.Delay(1200, ct);
++            }
++        }
++    }
++
++    private static string FileType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
++    {
++        ".jpg" or ".jpeg" => "public.jpeg", ".png" => "public.png", ".heic" => "public.heic",
++        ".pdf" => "com.adobe.pdf", ".txt" => "public.plain-text", ".mp4" => "public.mpeg-4",
++        ".mov" => "com.apple.quicktime-movie", _ => AirDropFileEntry.DefaultFileType
++    };
++
++    private sealed class TransferProgress(Action<long> report) : IProgress<long>
++    {
++        private long last;
++        public void Report(long value)
++        {
++            long now = Environment.TickCount64;
++            if (now - last < 200) return;
++            last = now; report(value);
++        }
++    }
++}
+diff --git a/tests/WinDrop.Protocol.Tests/OutgoingControllerTests.cs b/tests/WinDrop.Protocol.Tests/OutgoingControllerTests.cs
+new file mode 100644
+--- /dev/null
++++ b/tests/WinDrop.Protocol.Tests/OutgoingControllerTests.cs
+@@ -0,0 +1,142 @@
++using System.Net;
++using System.Net.Sockets;
++using System.Runtime.CompilerServices;
++using System.Text.Json;
++using System.Threading.Channels;
++using WinDrop.Cli;
++using WinDrop.Protocol;
++using WinDrop.Protocol.Discovery;
++using WinDrop.Protocol.Tls;
++
++namespace WinDrop.Protocol.Tests;
++
++public class OutgoingControllerTests
++{
++    [Theory]
++    [InlineData(true, 0)]
++    [InlineData(false, 0)]
++    [InlineData(true, 2)]
++    public async Task SelectedPeerTransferRespectsConsentAndPreservesBytes(bool accept, int transientFailures)
++    {
++        string directory = Path.Combine(Path.GetTempPath(), "outgoing-test-" + Guid.NewGuid().ToString("N"));
++        Directory.CreateDirectory(directory);
++        try
++        {
++            string source = Path.Combine(directory, "original.txt");
++            byte[] content = Enumerable.Range(0, 10000).Select(i => (byte)(i % 251)).ToArray();
++            await File.WriteAllBytesAsync(source, content);
++            using var lifetime = new CancellationTokenSource(TimeSpan.FromSeconds(20));
++            await using var transport = new LocalPeer(Path.Combine(directory, "received"), accept, lifetime.Token);
++            var events = Channel.CreateUnbounded<JsonElement>();
++            var controller = new OutgoingController(transport, value => events.Writer.TryWrite(JsonSerializer.SerializeToElement(value)), lifetime.Token);
++            controller.Command(JsonSerializer.SerializeToElement(new { op = "browse" }));
++            var peer = await Next(events.Reader, "outgoing-peer", lifetime.Token);
++            Assert.Equal("Test iPhone", peer.GetProperty("name").GetString());
++            controller.Command(JsonSerializer.SerializeToElement(new { op = "cancel-outgoing" }));
++            await Next(events.Reader, "outgoing-idle", lifetime.Token);
++            transport.Refusals = transientFailures;
++            transport.Sending = true;
++            controller.Command(JsonSerializer.SerializeToElement(new { op = "send", peer = peer.GetProperty("id").GetString(), paths = new[] { source } }));
++            var result = await Next(events.Reader, accept ? "outgoing-sent" : "outgoing-error", lifetime.Token);
++            await Next(events.Reader, "outgoing-idle", lifetime.Token);
++            Assert.StartsWith("request POST /Ask ", transport.Requests.First());
++            if (accept)
++            {
++                Assert.Equal(1, result.GetProperty("count").GetInt32());
++                string received = Assert.Single(Directory.GetFiles(Path.Combine(directory, "received"), "*", SearchOption.AllDirectories));
++                Assert.Equal(content, await File.ReadAllBytesAsync(received));
++            }
++            else
++            {
++                Assert.Contains("declined", result.GetProperty("message").GetString());
++                Assert.False(Directory.Exists(Path.Combine(directory, "received")) && Directory.GetFiles(Path.Combine(directory, "received"), "*", SearchOption.AllDirectories).Length > 0);
++            }
++        }
++        finally { Directory.Delete(directory, true); }
++    }
++
++    [Fact]
++    public async Task UnknownPeerCannotTriggerConnection()
++    {
++        using var lifetime = new CancellationTokenSource(TimeSpan.FromSeconds(5));
++        await using var transport = new LocalPeer(Path.GetTempPath(), false, lifetime.Token);
++        var events = Channel.CreateUnbounded<JsonElement>();
++        var controller = new OutgoingController(transport, value => events.Writer.TryWrite(JsonSerializer.SerializeToElement(value)), lifetime.Token);
++        controller.Command(JsonSerializer.SerializeToElement(new { op = "send", peer = "stale", paths = new[] { "/tmp/test" } }));
++        var result = await Next(events.Reader, "outgoing-error", lifetime.Token);
++        Assert.Contains("Search again", result.GetProperty("message").GetString());
++        await Next(events.Reader, "outgoing-idle", lifetime.Token);
++        Assert.Equal(0, transport.Connections);
++    }
++
++    [Fact]
++    public void SelectionRejectsMissingFilesAndDuplicateNames()
++    {
++        Assert.Throws<ArgumentException>(() => OutgoingController.ValidateFiles(Array.Empty<string>()));
++        Assert.Throws<ArgumentException>(() => OutgoingController.ValidateFiles(new[] { "/missing-file-" + Guid.NewGuid() }));
++        string directory = Path.Combine(Path.GetTempPath(), "selection-test-" + Guid.NewGuid());
++        Directory.CreateDirectory(Path.Combine(directory, "second"));
++        try
++        {
++            string first = Path.Combine(directory, "same.txt"), second = Path.Combine(directory, "second", "same.txt");
++            File.WriteAllText(first, "one"); File.WriteAllText(second, "two");
++            Assert.Throws<ArgumentException>(() => OutgoingController.ValidateFiles(new[] { first, second }));
++            OutgoingController.ValidateFiles(new[] { first });
++        }
++        finally { Directory.Delete(directory, true); }
++    }
++
++    private static async Task<JsonElement> Next(ChannelReader<JsonElement> events, string kind, CancellationToken ct)
++    {
++        while (true)
++        {
++            var item = await events.ReadAsync(ct);
++            if (item.GetProperty("kind").GetString() == kind) return item;
++            if (item.GetProperty("kind").GetString() == "outgoing-error") throw new Exception(item.ToString());
++        }
++    }
++
++    private sealed class LocalPeer(string destination, bool accept, CancellationToken lifetime) : IAirDropTransport
++    {
++        public int Connections;
++        public int Refusals;
++        public bool Sending;
++        public readonly System.Collections.Concurrent.ConcurrentQueue<string> Requests = new();
++        private readonly List<Task> servers = new();
++        public string Name => "loopback";
++        public bool CanReachAppleDevices => false;
++        public Task<IAsyncDisposable> AdvertiseAsync(AirDropServiceRecord record, CancellationToken ct = default) => throw new NotSupportedException();
++        public async IAsyncEnumerable<AirDropPeer> BrowseAsync([EnumeratorCancellation] CancellationToken ct = default)
++        {
++            yield return new AirDropPeer("test-device", new IPEndPoint(IPAddress.Loopback, 8770), AirDropReceiverFlags.SupportsDvZip, Name);
++            await Task.Delay(Timeout.Infinite, ct);
++        }
++        public IAsyncEnumerable<Stream> AcceptAsync(int port, CancellationToken ct = default) => throw new NotSupportedException();
++        public async Task<Stream> ConnectAsync(AirDropPeer peer, CancellationToken ct = default)
++        {
++            Connections++;
++            if (Refusals-- > 0) throw new SocketException((int)SocketError.ConnectionRefused);
++            var listener = new TcpListener(IPAddress.Loopback, 0);
++            listener.Start();
++            var server = Task.Run(async () =>
++            {
++                try
++                {
++                    using var client = await listener.AcceptTcpClientAsync(lifetime);
++                    using var certificate = AirDropCertificate.CreateSelfSigned("Test iPhone");
++                    await using var ssl = await AirDropTls.AuthenticateAsServerAsync(client.GetStream(), certificate, lifetime);
++                    var receiver = new AirDropReceiver(new AirDropReceiverOptions { ComputerName = "Test iPhone", DownloadDirectory = destination,
++                        ConsentHandler = (_, _) => Task.FromResult(accept), EarlyAskReply = false,
++                        Log = message => { if (Sending && message.StartsWith("request ")) Requests.Enqueue(message); } });
++                    await receiver.HandleConnectionAsync(ssl, lifetime);
++                }
++                finally { listener.Stop(); }
++            }, lifetime);
++            servers.Add(server);
++            var tcp = new TcpClient();
++            await tcp.ConnectAsync((IPEndPoint)listener.LocalEndpoint, ct);
++            return tcp.GetStream();
++        }
++        public async ValueTask DisposeAsync() { await Task.WhenAll(servers); }
++    }
++}
+diff --git a/tests/WinDrop.Protocol.Tests/DiscoveryCycleTests.cs b/tests/WinDrop.Protocol.Tests/DiscoveryCycleTests.cs
+new file mode 100644
+--- /dev/null
++++ b/tests/WinDrop.Protocol.Tests/DiscoveryCycleTests.cs
+@@ -0,0 +1,20 @@
++using System.Net;
++using WinDrop.Protocol.Discovery;
++
++namespace WinDrop.Protocol.Tests;
++
++public class DiscoveryCycleTests
++{
++    [Fact]
++    public void FreshSearchCanReportSamePhoneAgainWithoutReportingOurselves()
++    {
++        var assembler = new ServiceAssembler("test") { OwnInstance = "SwooshDrop" };
++        var phone = AirDropRecords.BuildAnnouncement(new AirDropServiceRecord("phone", 8770, AirDropReceiverFlags.None), "phone.local", new[] { IPAddress.Parse("fe80::1234") });
++        var own = AirDropRecords.BuildAnnouncement(new AirDropServiceRecord("SwooshDrop", 8770, AirDropReceiverFlags.None), "self.local", new[] { IPAddress.Parse("fe80::5678") });
++        Assert.Single(assembler.Absorb(phone, 1));
++        Assert.Empty(assembler.Absorb(phone, 1));
++        assembler.Reset();
++        Assert.Empty(assembler.Absorb(own, 1));
++        Assert.Single(assembler.Absorb(phone, 1));
++    }
++}
+diff --git a/tests/WinDrop.Protocol.Tests/SenderWireTests.cs b/tests/WinDrop.Protocol.Tests/SenderWireTests.cs
+new file mode 100644
+--- /dev/null
++++ b/tests/WinDrop.Protocol.Tests/SenderWireTests.cs
+@@ -0,0 +1,59 @@
++using System.Net;
++using System.Net.Sockets;
++using WinDrop.Protocol.Discovery;
++using WinDrop.Protocol.Http;
++using WinDrop.Protocol.Plist;
++using WinDrop.Protocol.Tls;
++
++namespace WinDrop.Protocol.Tests;
++
++public class SenderWireTests
++{
++    [Fact]
++    public async Task UploadRepeatsTheTransferIdAcceptedInAsk()
++    {
++        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
++        var ct = timeout.Token;
++        var listener = new TcpListener(IPAddress.Loopback, 0);
++        listener.Start();
++        string file = Path.Combine(Path.GetTempPath(), "sender-wire-" + Guid.NewGuid() + ".txt");
++        await File.WriteAllTextAsync(file, "original test content", ct);
++        try
++        {
++            var server = Task.Run(async () =>
++            {
++                using var tcp = await listener.AcceptTcpClientAsync(ct);
++                using var certificate = AirDropCertificate.CreateSelfSigned("wire-test");
++                await using var ssl = await AirDropTls.AuthenticateAsServerAsync(tcp.GetStream(), certificate, ct);
++                await using var http = new HttpConnection(ssl, false);
++                var ask = await http.ReadRequestHeadAsync(ct);
++                Assert.Equal("/Ask", ask!.Target);
++                var plist = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(BinaryPlistReader.Parse(await http.ReadBodyAsync(ask.Headers, 1048576, ct)));
++                var transfer = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(plist["TransferID"]);
++                string id = Assert.IsType<string>(transfer["id"]);
++                Assert.True(Guid.TryParse(id, out _));
++                var type = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(plist["TransferType"]);
++                Assert.True(type.ContainsKey("files"));
++                await http.WriteResponseAsync(200, "OK", new HttpHeaders(), Array.Empty<byte>(), ct);
++                var upload = await http.ReadRequestHeadAsync(ct);
++                Assert.Equal("/Upload", upload!.Target);
++                Assert.Equal(id, upload.Headers["TransferID"]);
++                Assert.Equal(new FileInfo(file).Length.ToString(), upload.Headers["TotalBytes"]);
++                Assert.Equal("application/x-dvzip", upload.Headers["Content-Type"]);
++                Assert.True(upload.Headers.IsChunked);
++                Assert.NotEmpty(await http.ReadBodyAsync(upload.Headers, 1048576, ct));
++                await http.WriteResponseAsync(200, "OK", new HttpHeaders(), Array.Empty<byte>(), ct);
++            }, ct);
++            using var client = new TcpClient();
++            await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint, ct);
++            using var clientCertificate = AirDropCertificate.CreateSelfSigned("sender");
++            await using var clientSsl = await AirDropTls.AuthenticateAsClientAsync(client.GetStream(), clientCertificate, ct);
++            await using var sender = new AirDropSenderSession(clientSsl, AirDropReceiverFlags.SupportsDvZip);
++            var selected = AirDropOutgoingFile.FromPath(file);
++            Assert.True(await sender.AskAsync(new AirDropAskRequest("SwooshDrop", "Windows", "sender", AirDropAskRequest.FinderBundleId, new[] { selected.ToEntry() }), ct));
++            await sender.UploadAsync(new[] { selected }, ct: ct);
++            await server;
++        }
++        finally { listener.Stop(); File.Delete(file); }
++    }
++}

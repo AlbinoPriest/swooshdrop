@@ -4,3 +4,5 @@
 *.patch text eol=lf -whitespace
 *.cs text eol=lf
 *.ps1 text eol=crlf
+# Preserve exact CRLF context from the pinned CLI source in this mixed-ending patch.
+patches/scoped-receive-events.patch -text

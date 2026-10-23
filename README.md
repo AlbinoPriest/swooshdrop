@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AlbinoPriest/swooshdrop/releases/download/v0.3.6/SwooshDropSetup.exe"><strong>Download the Windows beta ↗</strong></a>
+  <a href="https://github.com/AlbinoPriest/swooshdrop/releases"><strong>Download the Windows beta ↗</strong></a>
   &nbsp; · &nbsp;
   <a href="docs/COMPATIBILITY.md">Check your adapter</a>
   &nbsp; · &nbsp;
@@ -57,8 +57,13 @@ In the current source build, the tray icon is a grey outline with a transparent 
 
 - **Start with Windows**, with receiving enabled or paused until you need it.
 - **Pick your approval style:** Windows notifications or the integrated SwooshDrop popup.
-- **Choose your save folder** and whether accepted links open automatically.
+- **Choose your AirDrop name and save folder**, with a restart prompt when a running receiver needs to apply a change.
+- **Follow live receive progress** with the current filename, file position, percentage and bytes; interrupted transfers show an error.
+- **Switch the interface between English and Traditional Chinese (zh-TW).**
+- Choose whether accepted links open automatically.
 - **Read live logs** in Settings, with Activity, Radio, and Bridge views.
+- **Try sending files back** from the current source build's Send page: choose files, find nearby devices, select a recipient, then approve on the iPhone. Uses the same adapter and runtime as receiving. Outgoing transfers are experimental and have passed local protocol tests; real-iPhone sending is awaiting validation. Not included in the published 0.3.6 installer.
+- **Check for updates** in Settings or the tray menu. The current source build quietly checks GitHub once a day, includes beta releases, and offers a release-page download when a newer installer is available. Automatic checks can be disabled; nothing installs automatically.
 - **Pause the receiver** to return the adapter to Windows and stop the dedicated Linux runtime. Other WSL distributions remain running.
 
 Tempo Soft uses charcoal surfaces, soft coral accents, rounded controls, and editorial headings. Short hover, page, and popup animations respect Windows’ animation setting.
@@ -66,7 +71,7 @@ Tempo Soft uses charcoal surfaces, soft coral accents, rounded controls, and edi
 ## Get your first drop
 
 1. **Check your hardware.** Use a compatible dedicated USB Wi-Fi adapter, with Ethernet or a separate adapter for internet access.
-2. **[Download the beta](https://github.com/AlbinoPriest/swooshdrop/releases/tag/v0.3.6)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
+2. **[Download the beta](https://github.com/AlbinoPriest/swooshdrop/releases)** and run `SwooshDropSetup.exe`. Check prerequisites, select your adapter, then install. Restart manually if setup requests it and rerun setup.
 3. **Start receiving.** On your iPhone, turn on Wi-Fi and Bluetooth and choose AirDrop’s **Everyone for 10 Minutes** option.
 4. **Share → AirDrop → SwooshDrop.** Check the preview and press **Accept** on your PC.
 
@@ -83,7 +88,7 @@ Fresh installations save to **Downloads\SwooshDrop**. Upgrades keep your chosen 
 
 The adapter catalog includes **86 USB device IDs** with bundled Realtek and MediaTek drivers. All except the tested ID are experimental. Built-in PCI Wi-Fi, sharing Windows’ active Wi-Fi adapter, ARM/32-bit PCs, arbitrary adapters, and Contacts Only are unsupported.
 
-This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The installer is approximately **256 MiB** and includes corresponding source materials; setup downloads Ubuntu and runtime packages separately.
+This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Setup checks the kernel version and creates its own `WinDropRuntime` distribution. The published 0.3.6 installer is approximately **256 MiB** and includes corresponding source materials. The upcoming source build uses a smaller installer and distributes corresponding source as a separate asset; setup downloads Ubuntu and runtime packages separately.
 
 **Still a beta.** Discovery can be intermittent. Fresh second-PC and Windows 10 installs, sustained throughput, Live Photos, metadata fidelity, and experimental adapters need more testing. Builds are unsigned. [What has been tested →](docs/VALIDATION.md)
 
@@ -99,10 +104,14 @@ This beta’s radio modules require **`6.18.33.2-microsoft-standard-WSL2`**. Set
 
 Found a bug? [Open an issue](https://github.com/AlbinoPriest/swooshdrop/issues) with your Windows version, adapter USB ID, and what happened. Remove personal paths and transfer names before sharing logs.
 
+## Contributors
+
+Thanks to [**KuiDaXElaina**](https://github.com/KuiDaXElaina) for [their SwooshDrop improvements](https://github.com/KuiDaXElaina/SwooshDrop): Traditional Chinese localization, configurable AirDrop names and save folders, restart prompts, live receive progress, interrupted-transfer feedback, and the smaller installer with separate source downloads. Their six original commits and authorship are preserved in the integration history. See [the changelog](CHANGELOG.md) for integration details.
+
 ## Built on open source
 
 SwooshDrop’s Windows frontend, installer, and hardware integration are developed independently by **AlbinoPriest**. The AirDrop protocol implementation is adapted from [UvejsGj/WinDrop](https://github.com/UvejsGj/WinDrop), copyright 2026 Uvejs Gjelaj, under the MIT license. [OWL](https://github.com/seemoo-lab/owl) provides AWDL under GPL-3.0. Original copyright and license notices are retained.
 
-Our [MIT license](LICENSE) covers our original work; bundled components retain their own licenses. Setup includes OWL, GPL kernel/driver modules, firmware, notices, and corresponding sources, installed under `Sources`. See [component notices](THIRD-PARTY-NOTICES.md) and [pinned revisions](source-versions.json).
+Our [MIT license](LICENSE) covers our original work; bundled components retain their own licenses. Setup includes OWL, GPL kernel/driver modules, firmware, notices, and an exact source offer installed under `Sources`. The corresponding source archive is published separately on the same release page. See [component notices](THIRD-PARTY-NOTICES.md) and [pinned revisions](source-versions.json).
 
 **Unofficial community project.** SwooshDrop is not affiliated with, sponsored by, or endorsed by Apple, Microsoft, or the upstream WinDrop and OWL maintainers. AirDrop, iPhone, and Windows are third-party product names used to describe compatibility.
